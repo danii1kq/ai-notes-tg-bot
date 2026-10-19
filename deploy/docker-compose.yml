@@ -1,0 +1,44 @@
+# ai-notes-tg-bot — runtime-контейнер на VDS.
+#
+# Деплой: bash deploy/deploy.sh (на сервере) либо deploy\deploy.ps1 (с локалной машины).
+# Подробности: deploy/README.md
+
+services:
+  bot:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    # IMAGE_TAG=prev используется для отката на предыдущую версию (см. deploy.sh).
+    image: ai-notes-tg-bot:${IMAGE_TAG:-latest}
+    container_name: ai-notes-tg-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      TZ: ${TZ:-Asia/Almaty}
+    volumes:
+      # Персистентные данные (файлы, БД, кэш) переживают пересборку контейнера.
+      - app-data:/app/data
+    ports:
+      # Только loopback: наружу бот не торчит, доступ извне не требуется.
+      - "127.0.0.1:${BOT_PORT:-8081}:8080"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  app-data:
