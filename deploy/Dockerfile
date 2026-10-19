@@ -44,11 +44,14 @@ RUN /home/node/.local/bin/hermes pm install --extra mcp
 
 # The launchers are linked into the standard path, so the agent, the MCP
 # servers and every `docker exec` find them.
+USER root
 RUN ln -sf /home/node/.hermes/hermes-agent/hermes /usr/local/bin/hermes \
     && ln -sf /home/node/.local/bin/hermes-agent /usr/local/bin/hermes-agent \
-    && UV_DIR="$(dirname "$(find /home/node/.hermes/tools -maxdepth 3 -type f -name uv | head -n1)")" \
-    && ln -sf "$UV_DIR/uv" /usr/local/bin/uv \
-    && ln -sf "$UV_DIR/uvx" /usr/local/bin/uvx
+    && for dir in /home/node/.hermes/tools/uv-*; do \
+         ln -sf "$dir/uv" /usr/local/bin/uv; \
+         ln -sf "$dir/uvx" /usr/local/bin/uvx; \
+       done
+USER node
 
 # The Obsidian skill of the agent (MIT, Teknium / Hermes Agent).
 RUN mkdir -p /home/node/.hermes/skills/obsidian
