@@ -19,6 +19,8 @@ services:
     environment:
       NODE_ENV: production
       TZ: ${TZ:-Asia/Almaty}
+      # The health endpoint always listens on 8080 inside the container.
+      HEALTH_PORT: 8080
       # The vault is mounted from the host, inside the container it is /vault.
       OBSIDIAN_VAULT_PATH: /vault
       VAULT_EVENTS_FILE: /app/data/vault-events.json
