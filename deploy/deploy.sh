@@ -16,7 +16,9 @@ BRANCH="${DEPLOY_BRANCH:-main}"
 CONTAINER="ai-notes-tg-bot"
 IMAGE="ai-notes-tg-bot:latest"
 PREV="ai-notes-tg-bot:prev"
-COMPOSE=(docker compose -f deploy/docker-compose.yml)
+# -p дублирует name: из compose-файла: без явного имени проект получил бы имя
+# каталога ("deploy") и совпал бы с другим проектом на этом же сервере.
+COMPOSE=(docker compose -p ai-notes-tg-bot -f deploy/docker-compose.yml)
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 err() { printf '\033[1;31m!! %s\033[0m\n' "$*" >&2; }

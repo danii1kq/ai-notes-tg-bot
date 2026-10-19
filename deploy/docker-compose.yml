@@ -3,6 +3,11 @@
 # Деплой: bash deploy/deploy.sh (на сервере) либо deploy\deploy.ps1 (с локалной машины).
 # Подробности: deploy/README.md
 
+# ВАЖНО: name фиксирует имя compose-проекта. Без него Docker назвал бы проект
+# по имени каталога ("deploy") — на сервере так называется другой проект,
+# и `up --remove-orphans` снёс бы чужие контейнеры.
+name: ai-notes-tg-bot
+
 services:
   bot:
     build:
