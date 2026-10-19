@@ -60,7 +60,17 @@ async function main(): Promise<void> {
     sessionId: config.llm.sessionId || `selftest-${process.pid}`,
     logger: logger.child("llm"),
   });
-  await proxy.start();
+  // The bot process usually runs in the same container and already owns the
+  // proxy port. In that case the existing proxy is used.
+  let proxyStarted = false;
+  try {
+    await proxy.start();
+    proxyStarted = true;
+  } catch (error) {
+    logger.warn("the llm proxy is already running, the existing one is used", {
+      error: String(error),
+    });
+  }
 
   const hermes = new HermesClient({
     bin: config.hermes.bin,
@@ -77,7 +87,9 @@ async function main(): Promise<void> {
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 
   watcher.stop();
-  await proxy.stop();
+  if (proxyStarted) {
+    await proxy.stop();
+  }
   client.close();
   process.exit(0);
 }
