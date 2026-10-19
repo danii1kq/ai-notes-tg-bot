@@ -1,0 +1,74 @@
+# === Skills ===
+# Установленные скиллы (npx skills add) не коммитятся — восстанавливаются из skills-lock.json
+.agents/skills/
+skills-lock.json
+
+# === Секреты и окружение ===
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+venv/
+.venv/
+env/
+ENV/
+pip-wheel-metadata/
+
+# === Тесты и кэш ===
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# === Node.js ===
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+*.tsbuildinfo
+
+# === Логи и базы данных ===
+*.log
+logs/
+*.sqlite3
+*.sqlite3-journal
+*.db
+*.db-shm
+*.db-wal
+
+# === IDE / редакторы ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Прочее ===
+.ipynb_checkpoints/
+.cache/
+tmp/
+temp/
