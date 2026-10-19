@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 
 /**
@@ -86,6 +88,26 @@ export type AppConfig = {
   };
 };
 
+/**
+ * Finds the Hermes Agent binary. The name from the environment is looked up
+ * in the PATH, and when it is not there the standard place inside HERMES_HOME
+ * is used, so the agent is found even when the process was started without
+ * the prepared PATH.
+ */
+function resolveHermesBin(value: string, env: NodeJS.ProcessEnv): string {
+  if (value.includes(path.sep) || value.includes("/")) return value;
+
+  for (const directory of (env.PATH ?? "").split(path.delimiter)) {
+    if (!directory) continue;
+    const candidate = path.join(directory, value);
+    if (existsSync(candidate)) return candidate;
+  }
+
+  const home = env.HERMES_HOME ?? "/home/node/.hermes";
+  const candidate = path.join(home, "hermes-agent", value);
+  return existsSync(candidate) ? candidate : value;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = envSchema.safeParse(env);
   if (!parsed.success) {
@@ -127,7 +149,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       eventsFile: raw.VAULT_EVENTS_FILE,
     },
     hermes: {
-      bin: raw.HERMES_BIN,
+      bin: resolveHermesBin(raw.HERMES_BIN, env),
       model: raw.HERMES_MODEL,
       fallbackModel: raw.HERMES_FALLBACK_MODEL,
       timeoutMs: raw.HERMES_TIMEOUT_MS,

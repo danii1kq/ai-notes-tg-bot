@@ -42,6 +42,14 @@ RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh \
 # The MCP client of the agent (the Python SDK) is an optional extra.
 RUN /home/node/.local/bin/hermes pm install --extra mcp
 
+# The launchers are linked into the standard path, so the agent, the MCP
+# servers and every `docker exec` find them.
+RUN ln -sf /home/node/.hermes/hermes-agent/hermes /usr/local/bin/hermes \
+    && ln -sf /home/node/.local/bin/hermes-agent /usr/local/bin/hermes-agent \
+    && UV_DIR="$(dirname "$(find /home/node/.hermes/tools -maxdepth 3 -type f -name uv | head -n1)")" \
+    && ln -sf "$UV_DIR/uv" /usr/local/bin/uv \
+    && ln -sf "$UV_DIR/uvx" /usr/local/bin/uvx
+
 # The Obsidian skill of the agent (MIT, Teknium / Hermes Agent).
 RUN mkdir -p /home/node/.hermes/skills/obsidian
 COPY --chown=node:node hermes/skills/obsidian/SKILL.md /home/node/.hermes/skills/obsidian/SKILL.md
