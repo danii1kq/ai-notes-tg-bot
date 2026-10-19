@@ -56,9 +56,14 @@ finally {
 }
 
 if ($Rollback) {
-  Invoke-Native "ssh" @($Remote, "cd $RemotePath && bash deploy/deploy.sh --rollback")
+  $out = & ssh $Remote "cd $RemotePath && bash deploy/deploy.sh --rollback" 2>&1
 } else {
-  Invoke-Native "ssh" @($Remote, "cd $RemotePath && bash deploy/deploy.sh")
+  $out = & ssh $Remote "cd $RemotePath && bash deploy/deploy.sh" 2>&1
+}
+$code = $LASTEXITCODE
+Write-Host ($out | Out-String)
+if ($code -ne 0) {
+  throw "Деплой на сервере завершился с кодом $code"
 }
 
 Write-Host "Деплой завершён" -ForegroundColor Green
