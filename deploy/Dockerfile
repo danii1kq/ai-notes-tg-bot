@@ -60,6 +60,8 @@ RUN npm run build
 # --- Runtime -----------------------------------------------------------------
 FROM base AS runtime
 
+USER root
+
 WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
