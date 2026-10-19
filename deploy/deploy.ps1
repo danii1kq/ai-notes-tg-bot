@@ -23,14 +23,14 @@ $Remote = "server"
 $RemotePath = "/opt/ai-notes-tg-bot"
 
 function Invoke-Native {
-  param([string]$Exe, [string[]]$Args, [switch]$PassThru)
-  $output = & $Exe @Args 2>&1
+  # $Args зарезервирован в PowerShell, поэтому параметр называем $CmdArgs.
+  param([string]$Exe, [string[]]$CmdArgs)
+  $output = & $Exe @CmdArgs 2>&1
   $code = $LASTEXITCODE
   if ($code -ne 0) {
     Write-Host ($output | Out-String) -ForegroundColor DarkGray
     throw "$Exe завершился с кодом $code"
   }
-  if ($PassThru) { return $output }
 }
 
 Push-Location $Root
