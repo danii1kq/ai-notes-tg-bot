@@ -90,7 +90,8 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const logger = createLogger((process.env.LOG_LEVEL as "info") ?? "info", "mcp:vault");
+  // The stdout of an MCP server is the protocol channel, the logs go to stderr.
+  const logger = createLogger((process.env.LOG_LEVEL as "info") ?? "info", "mcp:vault", "stderr");
   const watcher = new VaultWatcher(vaultPath);
   watcher.start();
 

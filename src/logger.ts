@@ -1,4 +1,5 @@
 export type LogLevel = "debug" | "info" | "warn" | "error";
+export type LogStream = "stdout" | "stderr";
 
 const LEVELS: Record<LogLevel, number> = { debug: 10, info: 20, warn: 30, error: 40 };
 
@@ -26,8 +27,19 @@ export type Logger = {
   child(scope: string): Logger;
 };
 
-export function createLogger(level: LogLevel = "info", scope = "bot"): Logger {
+export function createLogger(
+  level: LogLevel = "info",
+  scope = "bot",
+  stream: LogStream = "stdout",
+): Logger {
   const threshold = LEVELS[level];
+  const write = (line: string, entryLevel: LogLevel) => {
+    if (entryLevel === "error" || stream === "stderr") {
+      process.stderr.write(`${line}\n`);
+    } else {
+      process.stdout.write(`${line}\n`);
+    }
+  };
 
   const emit = (entryLevel: LogLevel, message: string, context?: Record<string, unknown>) => {
     if (LEVELS[entryLevel] < threshold) return;
@@ -38,12 +50,7 @@ export function createLogger(level: LogLevel = "info", scope = "bot"): Logger {
       message,
       ...(context ? { context: redact(context) as Record<string, unknown> } : {}),
     };
-    const line = JSON.stringify(payload);
-    if (entryLevel === "error") {
-      process.stderr.write(`${line}\n`);
-    } else {
-      process.stdout.write(`${line}\n`);
-    }
+    write(JSON.stringify(payload), entryLevel);
   };
 
   return {
@@ -51,6 +58,6 @@ export function createLogger(level: LogLevel = "info", scope = "bot"): Logger {
     info: (message, context) => emit("info", message, context),
     warn: (message, context) => emit("warn", message, context),
     error: (message, context) => emit("error", message, context),
-    child: (childScope: string) => createLogger(level, `${scope}:${childScope}`),
+    child: (childScope: string) => createLogger(level, `${scope}:${childScope}`, stream),
   };
 }

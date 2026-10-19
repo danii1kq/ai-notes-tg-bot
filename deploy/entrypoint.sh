@@ -45,8 +45,8 @@ hermes config set model.api_key "local-proxy" 2>/dev/null || log "warning: could
 hermes config set model.default "${HERMES_MODEL:-minimax-m3.1-flash-free}" 2>/dev/null || log "warning: could not set model.default"
 
 # --- MCP servers ------------------------------------------------------------
-# `hermes mcp add` asks whether the tools may be enabled. The answer comes
-# from the pipe, the sleep keeps the pipe open while the server is tested.
+# The servers are written with `hermes config set`, the command that updates
+# the configuration without any interactive question.
 mcp_enabled() {
   local line
   line="$(hermes mcp list 2>/dev/null | grep -E "^[[:space:]]*$1[[:space:]]" || true)"
@@ -60,24 +60,17 @@ mcp_enabled() {
 # The vault: our own server, it writes the notes in a way that is safe for
 # Syncthing.
 if ! mcp_enabled vault; then
-  hermes mcp remove vault >/dev/null 2>&1 || true
-  { printf 'Y\n'; sleep 15; } | hermes mcp add vault \
-    --command node \
-    --env "OBSIDIAN_VAULT_PATH=${OBSIDIAN_VAULT_PATH:-/vault}" \
-    --env "VAULT_EVENTS_FILE=${VAULT_EVENTS_FILE:-/app/data/vault-events.json}" \
-    --env "TIMEZONE=${TZ:-Asia/Almaty}" \
-    --env "LOG_LEVEL=${LOG_LEVEL:-info}" \
-    --args /app/dist/vault/mcp-server.js >/dev/null 2>&1 \
-    || log "warning: could not add the vault mcp server"
+  hermes config set mcp_servers.vault.command node 2>/dev/null || log "warning: could not set the vault command"
+  hermes config set mcp_servers.vault.args '["/app/dist/vault/mcp-server.js"]' 2>/dev/null || log "warning: could not set the vault args"
+  hermes config set mcp_servers.vault.env "{\"OBSIDIAN_VAULT_PATH\":\"${OBSIDIAN_VAULT_PATH:-/vault}\",\"VAULT_EVENTS_FILE\":\"${VAULT_EVENTS_FILE:-/app/data/vault-events.json}\",\"TIMEZONE\":\"${TZ:-Asia/Almaty}\",\"LOG_LEVEL\":\"${LOG_LEVEL:-info}\"}" 2>/dev/null || log "warning: could not set the vault env"
+  hermes config set mcp_servers.vault.enabled true 2>/dev/null || log "warning: could not enable the vault server"
 fi
 
 # The web search: the DuckDuckGo server of the community.
 if ! mcp_enabled ddg-search; then
-  hermes mcp remove ddg-search >/dev/null 2>&1 || true
-  { printf 'Y\n'; sleep 20; } | hermes mcp add ddg-search \
-    --command uvx \
-    --args --with "duckduckgo-mcp-server[browser]" duckduckgo-mcp-server >/dev/null 2>&1 \
-    || log "warning: could not add the duckduckgo mcp server"
+  hermes config set mcp_servers.ddg-search.command uvx 2>/dev/null || log "warning: could not set the search command"
+  hermes config set mcp_servers.ddg-search.args '["--with","duckduckgo-mcp-server[browser]","duckduckgo-mcp-server"]' 2>/dev/null || log "warning: could not set the search args"
+  hermes config set mcp_servers.ddg-search.enabled true 2>/dev/null || log "warning: could not enable the search server"
 fi
 
 log "mcp servers:"
