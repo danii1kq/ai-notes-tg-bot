@@ -39,6 +39,9 @@ WORKDIR /home/node
 RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh \
       | bash -s -- --non-interactive --skip-browser --skip-computer-use
 
+# The MCP client of the agent (the Python SDK) is an optional extra.
+RUN /home/node/.local/bin/hermes pm install --extra mcp
+
 # The Obsidian skill of the agent (MIT, Teknium / Hermes Agent).
 RUN mkdir -p /home/node/.hermes/skills/obsidian
 COPY --chown=node:node hermes/skills/obsidian/SKILL.md /home/node/.hermes/skills/obsidian/SKILL.md

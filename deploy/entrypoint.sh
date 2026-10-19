@@ -42,8 +42,25 @@ chmod 600 "$HERMES_HOME/.env"
 hermes config set model.provider custom 2>/dev/null || log "warning: could not set model.provider"
 hermes config set model.base_url "http://127.0.0.1:${LLM_PROXY_PORT:-11434}/v1" 2>/dev/null || log "warning: could not set model.base_url"
 hermes config set model.api_key "local-proxy" 2>/dev/null || log "warning: could not set model.api_key"
+hermes config set model.default "${HERMES_MODEL:-minimax-m3.1-flash-free}" 2>/dev/null || log "warning: could not set model.default"
 
 # --- MCP servers ------------------------------------------------------------
+# The vault: our own server, it writes the notes in a way that is safe for
+# Syncthing. The web search: the DuckDuckGo server of the community.
+hermes mcp remove vault >/dev/null 2>&1 || true
+hermes mcp add vault \
+  --command node \
+  --env "OBSIDIAN_VAULT_PATH=${OBSIDIAN_VAULT_PATH:-/vault}" \
+  --env "VAULT_EVENTS_FILE=${VAULT_EVENTS_FILE:-/app/data/vault-events.json}" \
+  --env "TIMEZONE=${TZ:-Asia/Almaty}" \
+  --env "LOG_LEVEL=${LOG_LEVEL:-info}" \
+  --args /app/dist/vault/mcp-server.js >/dev/null || log "warning: could not add the vault mcp server"
+
+hermes mcp remove ddg-search >/dev/null 2>&1 || true
+hermes mcp add ddg-search \
+  --command uvx \
+  --args --with "duckduckgo-mcp-server[browser]" duckduckgo-mcp-server >/dev/null || log "warning: could not add the duckduckgo mcp server"
+
 log "mcp servers:"
 hermes mcp list 2>&1 | sed 's/^/[entrypoint] /' || log "warning: could not list the mcp servers"
 
