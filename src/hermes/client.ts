@@ -58,16 +58,20 @@ export class HermesClient {
     model: string,
   ): Promise<Omit<HermesRunResult, "model" | "usedFallback">> {
     const startedAt = Date.now();
+    // `hermes chat -q` runs one query in the working directory (the agent
+    // workspace with the rules) and prints the final answer.
     const args = [
-      "-z",
+      "chat",
+      "-Q",
+      "-q",
       prompt,
-      "--yolo",
-      "-m",
-      model,
       "--max-turns",
       String(this.options.maxTurns),
+      "--yolo",
       "--skills",
       "obsidian",
+      "-m",
+      model,
     ];
 
     return new Promise((resolve) => {
@@ -148,5 +152,5 @@ function cleanOutput(raw: string): string {
 }
 
 function isNoise(line: string): boolean {
-  return /^(hermes|welcome|connecting|loading|session|model:|provider:)/i.test(line.trim());
+  return /^(hermes|welcome|connecting|loading|session|session_id:|model:|provider:)/i.test(line.trim());
 }
