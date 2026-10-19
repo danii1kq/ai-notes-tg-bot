@@ -1,34 +1,40 @@
-# ai-notes-tg-bot — runtime-контейнер на VDS.
+# ai-notes-tg-bot -> telegram-to-obsidian-ai-agent
 #
-# Деплой: bash deploy/deploy.sh (на сервере) либо deploy\deploy.ps1 (с локалной машины).
-# Подробности: deploy/README.md
-
-# ВАЖНО: name фиксирует имя compose-проекта. Без него Docker назвал бы проект
-# по имени каталога ("deploy") — на сервере так называется другой проект,
-# и `up --remove-orphans` снёс бы чужие контейнеры.
-name: ai-notes-tg-bot
+# The compose project is pinned to a name of its own: without it Docker would
+# name the project after the directory ("deploy"), and on a server that
+# name belongs to another project - `up --remove-orphans` would then
+# remove somebody else's containers.
+name: telegram-to-obsidian-ai-agent
 
 services:
-  bot:
+  app:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    # IMAGE_TAG=prev используется для отката на предыдущую версию (см. deploy.sh).
-    image: ai-notes-tg-bot:${IMAGE_TAG:-latest}
-    container_name: ai-notes-tg-bot
+    image: telegram-to-obsidian-ai-agent:latest
+    container_name: telegram-to-obsidian-bot
     restart: unless-stopped
     env_file:
       - .env
     environment:
       NODE_ENV: production
-      PORT: 8080
       TZ: ${TZ:-Asia/Almaty}
+      # The vault is mounted from the host, inside the container it is /vault.
+      OBSIDIAN_VAULT_PATH: /vault
+      VAULT_EVENTS_FILE: /app/data/vault-events.json
+      DB_PATH: /app/data/app.db
+      HERMES_WORKSPACE: /app/hermes-workspace
+      HERMES_MODEL: ${HERMES_MODEL:-minimax-m3.1-flash-free}
+      HERMES_FALLBACK_MODEL: ${HERMES_FALLBACK_MODEL:-deepseek-v4.1-flash}
+      LLM_PROVIDER_BASE_URL: ${LLM_PROVIDER_BASE_URL:-https://opencode.ai/zen/go/v1}
+      LLM_PROXY_PORT: ${LLM_PROXY_PORT:-11434}
     volumes:
-      # Персистентные данные (файлы, БД, кэш) переживают пересборку контейнера.
+      # The same folder is mounted into the agent and into Syncthing.
+      - ${VAULT_HOST_PATH:-/opt/obsidian-vault}:/vault
       - app-data:/app/data
     ports:
-      # Только loopback: наружу бот не торчит, доступ извне не требуется.
-      - "127.0.0.1:${BOT_PORT:-8081}:8080"
+      # The health endpoint is only reachable from the host.
+      - "127.0.0.1:${HEALTH_PORT:-8080}:8080"
     healthcheck:
       test:
         - CMD
@@ -38,7 +44,31 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 20s
+    depends_on:
+      - syncthing
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  syncthing:
+    image: linuxserver/syncthing:latest
+    container_name: telegram-to-obsidian-syncthing
+    restart: unless-stopped
+    environment:
+      # The same user as the app container, so both can write the notes.
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Asia/Almaty}
+    volumes:
+      - ${VAULT_HOST_PATH:-/opt/obsidian-vault}:/vault
+      - syncthing-config:/config
+    ports:
+      - "8384:8384" # web interface
+      - "22000:22000/tcp" # sync
+      - "21027:21027/udp" # discovery
     logging:
       driver: json-file
       options:
@@ -47,3 +77,4 @@ services:
 
 volumes:
   app-data:
+  syncthing-config:

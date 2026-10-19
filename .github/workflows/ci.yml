@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.VDS_SSH_KEY != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up the ssh key
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VDS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.VDS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy to the server
+        env:
+          VDS_HOST: ${{ secrets.VDS_HOST }}
+          VDS_PATH: ${{ secrets.VDS_PATH }}
+        run: |
+          ssh -i ~/.ssh/id_ed25519 "root@$VDS_HOST" "cd $VDS_PATH && bash deploy/deploy.sh"

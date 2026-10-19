@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Деплой ai-notes-tg-bot на VDS (<server>).
+# Deploys the bot on the VDS.
 #
-#   bash deploy/deploy.sh              — обычный деплой: pull → build → up → healthcheck
-#   bash deploy/deploy.sh --rollback   — откат на предыдущую версию (:prev)
+#   bash deploy/deploy.sh              - normal deploy: pull -> build -> up -> healthcheck
+#   bash deploy/deploy.sh --rollback   - roll back to the previous image (:prev)
 #
-# Скрипт идемпотентен и безопасен: при неудачном healthcheck автоматически
-# откатывается на :prev и возвращает ненулевой код.
+# The script is idempotent and safe: when the new container does not become
+# healthy it rolls back to :prev and returns a non zero exit code.
 
 set -euo pipefail
 
@@ -13,25 +13,26 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 BRANCH="${DEPLOY_BRANCH:-main}"
-CONTAINER="ai-notes-tg-bot"
-IMAGE="ai-notes-tg-bot:latest"
-PREV="ai-notes-tg-bot:prev"
-# -p дублирует name: из compose-файла: без явного имени проект получил бы имя
-# каталога ("deploy") и совпал бы с другим проектом на этом же сервере.
-COMPOSE=(docker compose -p ai-notes-tg-bot -f deploy/docker-compose.yml)
+CONTAINER="telegram-to-obsidian-bot"
+IMAGE="telegram-to-obsidian-ai-agent:latest"
+PREV="telegram-to-obsidian-ai-agent:prev"
+# -p repeats the name: from the compose file, without it the project would be
+# named after the directory ("deploy"), a name that belongs to another project
+# on this server.
+COMPOSE=(docker compose -p telegram-to-obsidian-ai-agent -f deploy/docker-compose.yml)
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 err() { printf '\033[1;31m!! %s\033[0m\n' "$*" >&2; }
 
 rollback() {
-  log "Откат на образ $PREV"
+  log "Rolling back to the image $PREV"
   if ! docker image inspect "$PREV" >/dev/null 2>&1; then
-    err "Образа $PREV нет — откат невозможен"
+    err "The image $PREV does not exist, a rollback is not possible"
     return 1
   fi
   IMAGE_TAG=prev "${COMPOSE[@]}" up -d --no-build --remove-orphans
   docker image tag "$PREV" "$IMAGE"
-  log "Откат выполнен"
+  log "The rollback is done"
 }
 
 if [[ "${1:-}" == "--rollback" ]]; then
@@ -39,10 +40,15 @@ if [[ "${1:-}" == "--rollback" ]]; then
   exit $?
 fi
 
+if [ ! -f deploy/.env ]; then
+  err "deploy/.env is missing, copy deploy/.env.example and fill it in"
+  exit 1
+fi
+
 log "git pull origin $BRANCH"
 git pull --ff-only origin "$BRANCH"
 
-log "Тегируем текущую версию как :prev"
+log "Tagging the current version as :prev"
 if docker image inspect "$IMAGE" >/dev/null 2>&1; then
   docker image tag "$IMAGE" "$PREV"
 fi
@@ -53,9 +59,9 @@ log "docker compose build"
 log "docker compose up -d"
 "${COMPOSE[@]}" up -d --remove-orphans
 
-log "Ждём healthcheck (до 60 с)"
+log "Waiting for the healthcheck (up to 90 s)"
 healthy=0
-for _ in $(seq 1 30); do
+for _ in $(seq 1 45); do
   status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$CONTAINER" 2>/dev/null || echo missing)"
   case "$status" in
     healthy)
@@ -63,7 +69,7 @@ for _ in $(seq 1 30); do
       break
       ;;
     unhealthy | exited | missing | dead)
-      err "Контейнер в статусе: $status"
+      err "The container is in the state: $status"
       rollback || true
       exit 1
       ;;
@@ -72,14 +78,14 @@ for _ in $(seq 1 30); do
 done
 
 if [[ "$healthy" -ne 1 ]]; then
-  err "Healthcheck не пройден за отведённое время"
+  err "The healthcheck did not pass in time"
   rollback || true
   exit 1
 fi
 
-log "Статус контейнеров"
+log "Status of the containers"
 "${COMPOSE[@]}" ps
 
 docker image prune -f --filter "until=168h" >/dev/null 2>&1 || true
 
-log "Деплой завершён успешно"
+log "The deployment is done"

@@ -45,6 +45,19 @@ yarn-error.log*
 pnpm-debug.log*
 .pnpm-store/
 *.tsbuildinfo
+dist/
+coverage/
+
+# === Локальное состояние ===
+data/
+*.db
+*.db-shm
+*.db-wal
+vault-events.json
+
+# === Скиллы и навыки Hermes ===
+.agents/
+.hermes/
 
 # === Логи и базы данных ===
 *.log

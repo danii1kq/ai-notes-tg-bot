@@ -1,18 +1,84 @@
 # syntax=docker/dockerfile:1
 
-FROM node:22-alpine
+# ==============================================================================
+# Telegram to Obsidian agent
+#
+#   stage 1 (base)    : Node.js + Hermes Agent (the AI agent that writes notes)
+#   stage 2 (builder) : compiles the TypeScript sources
+#   stage 3 (runtime) : the final image with the application and the agent
+# ==============================================================================
+
+FROM node:22-bookworm-slim AS base
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    NODE_ENV=production \
+    HERMES_HOME=/home/node/.hermes \
+    LLM_PROXY_PORT=11434 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+# git and curl are needed by the Hermes installer, python by its own runtime.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      curl \
+      git \
+      python3 \
+      python3-venv \
+      python3-pip \
+      build-essential \
+      util-linux \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- Hermes Agent ------------------------------------------------------------
+# The agent is installed into the home directory of the `node` user, so it
+# lives in the image and does not need the network at runtime.
+USER node
+WORKDIR /home/node
+
+RUN curl -fsSL https://hermes-agent.nousresearch.com/install.sh \
+      | bash -s -- --non-interactive --skip-browser --skip-computer-use \
+    && /home/node/.hermes/hermes-agent/.venv/bin/python -c "import pm; pm.sync_venv(['mcp'], explicit=True)" \
+    || /home/node/.local/bin/hermes pm install mcp
+
+# The Obsidian skill of the agent (MIT, Teknium / Hermes Agent).
+RUN mkdir -p /home/node/.hermes/skills/obsidian
+COPY --chown=node:node hermes/skills/obsidian/SKILL.md /home/node/.hermes/skills/obsidian/SKILL.md
+
+# --- Application build -------------------------------------------------------
+FROM base AS builder
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+# --- Runtime -----------------------------------------------------------------
+FROM base AS runtime
 
 WORKDIR /app
 
-# Зависимости отдельным слоем — пересобираются только при изменении манифестов.
-COPY app/package*.json ./
-RUN npm install --omit=dev --no-audit --no-fund
+COPY --from=builder /app/dist ./dist
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
-COPY app/ ./
+# The rules of the agent and the entrypoint of the container.
+COPY --chown=node:node hermes/workspace/.hermes.md /app/hermes-workspace/.hermes.md
+COPY --chown=node:node deploy/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-ENV NODE_ENV=production \
-    PORT=8080
+RUN mkdir -p /app/data /vault && chown -R node:node /app/data /vault
+VOLUME ["/app/data"]
 
-EXPOSE 8080
+ENV HERMES_WORKSPACE=/app/hermes-workspace \
+    OBSIDIAN_VAULT_PATH=/vault \
+    VAULT_EVENTS_FILE=/app/data/vault-events.json \
+    DB_PATH=/app/data/app.db
 
-CMD ["node", "index.js"]
+USER node
+EXPOSE 11434
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["node", "dist/index.js"]

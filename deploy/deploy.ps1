@@ -1,10 +1,10 @@
 <#
-  Локальный помощник для деплоя на VDS.
+  Local helper for the deployment on the VDS.
 
-    .\deploy\deploy.ps1                      — закоммитить, запушить и задеплоить
-    .\deploy\deploy.ps1 -Message "feat: x"  — с кастомным сообщением коммита
-    .\deploy\deploy.ps1 -SkipCommit         — только push + деплой
-    .\deploy\deploy.ps1 -Rollback           — откат на предыдущую версию на сервере
+    .\deploy\deploy.ps1                      - commit, push and deploy
+    .\deploy\deploy.ps1 -Message "feat: x"  - with a custom commit message
+    .\deploy\deploy.ps1 -SkipCommit         - only push and deploy
+    .\deploy\deploy.ps1 -Rollback           - roll back on the server
 #>
 param(
   [string]$Message = "chore: deploy",
@@ -13,23 +13,23 @@ param(
   [switch]$Rollback
 )
 
-# Native-команды (git/ssh) пишут предупреждения в stderr, а Windows PowerShell
-# 5.1 при ErrorActionPreference=Stop превращает их в terminating error.
-# Поэтому коды возврата проверяем вручную, а stderr глушим.
+# Native commands (git, ssh) write warnings to stderr, and Windows PowerShell
+# 5.1 turns them into a terminating error when ErrorActionPreference is Stop.
+# So the exit codes are checked by hand and stderr is not treated as a failure.
 $ErrorActionPreference = "Continue"
 
 $Root = Split-Path -Parent $PSScriptRoot
 $Remote = "server"
-$RemotePath = "/opt/ai-notes-tg-bot"
+$RemotePath = "/opt/telegram-to-obsidian-ai-agent"
 
 function Invoke-Native {
-  # $Args зарезервирован в PowerShell, поэтому параметр называем $CmdArgs.
+  # $Args is reserved in PowerShell, so the parameter is called $CmdArgs.
   param([string]$Exe, [string[]]$CmdArgs)
   $output = & $Exe @CmdArgs 2>&1
   $code = $LASTEXITCODE
   if ($code -ne 0) {
     Write-Host ($output | Out-String) -ForegroundColor DarkGray
-    throw "$Exe завершился с кодом $code"
+    throw "$Exe finished with the code $code"
   }
 }
 
@@ -40,15 +40,15 @@ try {
     & git diff --cached --quiet
     if ($LASTEXITCODE -ne 0) {
       Invoke-Native "git" @("commit", "-m", $Message)
-      Write-Host "Коммит создан" -ForegroundColor Green
+      Write-Host "The commit is created" -ForegroundColor Green
     } else {
-      Write-Host "Нет изменений — коммит пропущен" -ForegroundColor DarkGray
+      Write-Host "There are no changes, the commit is skipped" -ForegroundColor DarkGray
     }
   }
 
   if (-not $SkipPush -and -not $Rollback) {
     Invoke-Native "git" @("push", "origin", "main")
-    Write-Host "Запушено в origin/main" -ForegroundColor Green
+    Write-Host "Pushed to origin/main" -ForegroundColor Green
   }
 }
 finally {
@@ -63,7 +63,7 @@ if ($Rollback) {
 $code = $LASTEXITCODE
 Write-Host ($out | Out-String)
 if ($code -ne 0) {
-  throw "Деплой на сервере завершился с кодом $code"
+  throw "The deployment on the server finished with the code $code"
 }
 
-Write-Host "Деплой завершён" -ForegroundColor Green
+Write-Host "The deployment is done" -ForegroundColor Green

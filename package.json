@@ -1,0 +1,37 @@
+{
+  "name": "telegram-to-obsidian-ai-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Telegram bot that turns voice-of-thought messages into Obsidian notes via Hermes Agent",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "selftest": "node dist/selftest.js",
+    "mcp:vault": "node dist/vault/mcp-server.js",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "dotenv": "^18.0.8",
+    "drizzle-orm": "^0.45.4",
+    "grammy": "^1.46.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

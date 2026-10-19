@@ -1,18 +1,28 @@
-# Активы и мусор не должны попадать в контекст сборки.
+# Everything that is not needed inside the image.
 .git
 .gitignore
+.gitattributes
+.github
 .agents
 skills-lock.json
-deploy
 node_modules
 **/node_modules
-**/.env
-**/.env.*
-!**/.env.example
+dist
+**/dist
+coverage
+**/coverage
+tests
+**/tests
 *.log
 logs
-data
 **/data
+**/*.db
+**/*.sqlite3
+.env
+**/.env
+!**/.env.example
 .vscode
 .idea
+.DS_Store
+Thumbs.db
 README.md
