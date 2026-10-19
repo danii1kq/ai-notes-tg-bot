@@ -13,27 +13,42 @@ param(
   [switch]$Rollback
 )
 
-$ErrorActionPreference = "Stop"
+# Native-команды (git/ssh) пишут предупреждения в stderr, а Windows PowerShell
+# 5.1 при ErrorActionPreference=Stop превращает их в terminating error.
+# Поэтому коды возврата проверяем вручную, а stderr глушим.
+$ErrorActionPreference = "Continue"
+
 $Root = Split-Path -Parent $PSScriptRoot
 $Remote = "server"
 $RemotePath = "/opt/ai-notes-tg-bot"
 
+function Invoke-Native {
+  param([string]$Exe, [string[]]$Args, [switch]$PassThru)
+  $output = & $Exe @Args 2>&1
+  $code = $LASTEXITCODE
+  if ($code -ne 0) {
+    Write-Host ($output | Out-String) -ForegroundColor DarkGray
+    throw "$Exe завершился с кодом $code"
+  }
+  if ($PassThru) { return $output }
+}
+
 Push-Location $Root
 try {
   if (-not $SkipCommit) {
-    git add -A
-    git diff --cached --quiet
+    Invoke-Native "git" @("add", "-A")
+    & git diff --cached --quiet
     if ($LASTEXITCODE -ne 0) {
-      git commit -m $Message
-      if ($LASTEXITCODE -ne 0) { throw "git commit не удался" }
+      Invoke-Native "git" @("commit", "-m", $Message)
+      Write-Host "Коммит создан" -ForegroundColor Green
     } else {
       Write-Host "Нет изменений — коммит пропущен" -ForegroundColor DarkGray
     }
   }
 
   if (-not $SkipPush -and -not $Rollback) {
-    git push origin main
-    if ($LASTEXITCODE -ne 0) { throw "git push не удался" }
+    Invoke-Native "git" @("push", "origin", "main")
+    Write-Host "Запушено в origin/main" -ForegroundColor Green
   }
 }
 finally {
@@ -41,9 +56,9 @@ finally {
 }
 
 if ($Rollback) {
-  ssh $Remote "cd $RemotePath && bash deploy/deploy.sh --rollback"
+  Invoke-Native "ssh" @($Remote, "cd $RemotePath && bash deploy/deploy.sh --rollback")
 } else {
-  ssh $Remote "cd $RemotePath && bash deploy/deploy.sh"
+  Invoke-Native "ssh" @($Remote, "cd $RemotePath && bash deploy/deploy.sh")
 }
 
-if ($LASTEXITCODE -ne 0) { throw "Деплой на сервере завершился с ошибкой" }
+Write-Host "Деплой завершён" -ForegroundColor Green
