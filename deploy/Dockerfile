@@ -46,9 +46,13 @@ COPY --chown=node:node hermes/skills/obsidian/SKILL.md /home/node/.hermes/skills
 # --- Application build -------------------------------------------------------
 FROM base AS builder
 
+# The base image runs in production mode, but the compiler needs the dev
+# dependencies.
+ENV NODE_ENV=development
+
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --include=dev
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
