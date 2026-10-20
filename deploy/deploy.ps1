@@ -10,7 +10,10 @@ param(
   [string]$Message = "chore: deploy",
   [switch]$SkipCommit,
   [switch]$SkipPush,
-  [switch]$Rollback
+  [switch]$Rollback,
+  # The ssh target of the server: an alias from ~/.ssh/config or user@host.
+  # It can also be set with the environment variable VDS_SSH_HOST.
+  [string]$Remote = $(if ($env:VDS_SSH_HOST) { $env:VDS_SSH_HOST } else { "server" })
 )
 
 # Native commands (git, ssh) write warnings to stderr, and Windows PowerShell
@@ -19,7 +22,6 @@ param(
 $ErrorActionPreference = "Continue"
 
 $Root = Split-Path -Parent $PSScriptRoot
-$Remote = "server"
 $RemotePath = "/opt/telegram-to-obsidian-ai-agent"
 
 function Invoke-Native {

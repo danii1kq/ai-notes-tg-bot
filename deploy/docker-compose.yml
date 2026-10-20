@@ -1,9 +1,9 @@
 # ai-notes-tg-bot -> telegram-to-obsidian-ai-agent
 #
 # The compose project is pinned to a name of its own: without it Docker would
-# name the project after the directory ("deploy"), and on a server that
-# name belongs to another project - `up --remove-orphans` would then
-# remove somebody else's containers.
+# name the project after the directory ("deploy"), and on a server that hosts
+# several projects in folders of the same name, `up --remove-orphans` would
+# remove the containers of another project.
 name: telegram-to-obsidian-ai-agent
 
 services:
