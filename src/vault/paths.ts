@@ -40,11 +40,13 @@ export function toRelative(vaultRoot: string, absolutePath: string): string {
 
 /**
  * Turns a note title into a safe file name. Obsidian titles may contain
- * slashes, quotes or colons; the file name must not.
+ * slashes, quotes or colons; the file name must not. A long dash becomes a
+ * simple hyphen.
  */
 export function sanitizeFileName(title: string): string {
   const cleaned = title
     .replace(/[\\/:*?"<>|#^[\]]/g, " ")
+    .replace(/[—–‒―]/g, "-")
     .replace(/\s+/g, " ")
     .replace(/^\.+/, "")
     .replace(/\.+$/, "")

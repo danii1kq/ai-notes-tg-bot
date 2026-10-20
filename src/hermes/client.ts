@@ -152,5 +152,7 @@ function cleanOutput(raw: string): string {
 }
 
 function isNoise(line: string): boolean {
-  return /^(hermes|welcome|connecting|loading|session|session_id:|model:|provider:)/i.test(line.trim());
+  return /^(hermes|welcome|connecting|loading|session|session_id:|model:|provider:)/i.test(
+    line.trim(),
+  );
 }

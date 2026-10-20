@@ -30,6 +30,17 @@ export interface VaultOperationsDeps {
 const MAX_SCANNED_BYTES = 512 * 1024;
 const MAX_SEARCH_HITS = 60;
 
+/** The long dashes that are never written into a note. */
+const LONG_DASHES = /[—–‒―]/g;
+
+/**
+ * Replaces the long dashes with a simple hyphen. The agent is told not to use
+ * them, and this is the guarantee that none of them reaches a note.
+ */
+export function normalizeDashes(text: string): string {
+  return text.replace(LONG_DASHES, "-");
+}
+
 /**
  * The file operations exposed to Hermes Agent as MCP tools and used by the
  * application itself when the agent is not able to run.
@@ -161,7 +172,7 @@ export class VaultOperations {
     const absolute = resolveInsideVault(this.vaultRoot, targetPath);
     const titles = options.autoLink === false ? [] : await this.noteTitles();
     const selfTitle = path.basename(absolute).replace(/\.md$/i, "");
-    const linked = autoLinkEntities(content, titles, selfTitle);
+    const linked = autoLinkEntities(normalizeDashes(content), titles, selfTitle);
     const withFrontmatter = ensureFrontmatter(linked, this.currentDate());
 
     const result = await this.deps.guard.write(absolute, withFrontmatter);
@@ -176,7 +187,7 @@ export class VaultOperations {
     options: { source?: VaultEvent["source"] } = {},
   ): Promise<WriteResult> {
     const absolute = resolveInsideVault(this.vaultRoot, targetPath);
-    const result = await this.deps.guard.append(absolute, block);
+    const result = await this.deps.guard.append(absolute, normalizeDashes(block));
     await this.record(result, options.source ?? "agent");
     return result;
   }
