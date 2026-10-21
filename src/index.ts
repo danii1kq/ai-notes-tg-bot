@@ -2,11 +2,12 @@ import { mkdir } from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
 import type { Bot } from "grammy";
+import { listInbox, searchNotes, undoLast } from "./bot/actions.js";
 import { createBot } from "./bot/bot.js";
 import { MessageQueue } from "./bot/queue.js";
 import { loadConfig } from "./config.js";
 import { createDatabase } from "./db/index.js";
-import { notesLog } from "./db/schema.js";
+import { notesLog, undoLog } from "./db/schema.js";
 import { HermesClient } from "./hermes/client.js";
 import { createLlmProxy } from "./llm/proxy.js";
 import { createLogger } from "./logger.js";
@@ -100,6 +101,16 @@ async function main(): Promise<void> {
             bytes: 0,
             telegramUserId: String(userId),
           });
+          if (result.action !== "none") {
+            await db.insert(undoLog).values({
+              createdAt: new Date().toISOString(),
+              action: result.action,
+              path: result.path,
+              title: result.title,
+              block: result.block ?? null,
+              telegramUserId: String(userId),
+            });
+          }
         } catch (error) {
           logger.error("could not process the message", { error: String(error) });
           await bot.api
@@ -114,6 +125,11 @@ async function main(): Promise<void> {
       const lines = rows.map((row) => `• ${row.title} (${row.action})`);
       return `Последние записи:\n${lines.join("\n")}`;
     },
+    onSearch: async (query, _userId) =>
+      searchNotes(query, { vault, db, logger: logger.child("actions") }),
+    onUndo: async (userId, confirmed) =>
+      undoLast({ vault, db, logger: logger.child("actions") }, userId, confirmed),
+    onInbox: async () => listInbox({ vault, db, logger: logger.child("actions") }),
   });
 
   const healthServer = createServer((request, response) => {

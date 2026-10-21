@@ -3,7 +3,8 @@ import type { HermesClient } from "./hermes/client.js";
 import { buildPrompt } from "./hermes/prompt.js";
 import type { Logger } from "./logger.js";
 import { readEvents, type VaultEvent } from "./vault/events.js";
-import type { VaultOperations } from "./vault/operations.js";
+import { normalizeDashes, type VaultOperations } from "./vault/operations.js";
+import { extractTags, mergeTags } from "./vault/tags.js";
 
 export interface PipelineDeps {
   config: AppConfig;
@@ -20,6 +21,8 @@ export interface ProcessResult {
   path: string;
   usedFallback: boolean;
   agentText: string;
+  /** The block that was appended, so the append can be undone. */
+  block?: string;
 }
 
 /**
@@ -33,6 +36,7 @@ export async function processMessage(
 ): Promise<ProcessResult> {
   const startedAt = Date.now();
   const titles = await deps.vault.noteTitles();
+  const tags = extractTags(text);
 
   const prompt = buildPrompt(text, {
     now: new Date(),
@@ -45,6 +49,7 @@ export async function processMessage(
     chars: text.length,
     model: deps.config.hermes.model,
     userId: telegramUserId,
+    tags,
   });
   const run = await deps.hermes.run(prompt);
   deps.logger.info("the agent finished", {
@@ -59,6 +64,9 @@ export async function processMessage(
 
   if (fresh.length > 0) {
     const last = fresh[fresh.length - 1] as VaultEvent;
+    if (tags.length > 0) {
+      await applyTags(deps.vault, last.path, tags);
+    }
     return {
       status: statusFor(last),
       action: last.action,
@@ -66,6 +74,7 @@ export async function processMessage(
       path: last.path,
       usedFallback: false,
       agentText: run.text,
+      ...(last.block ? { block: last.block } : {}),
     };
   }
 
@@ -88,10 +97,14 @@ async function fallbackWrite(
   const title = deriveTitle(text);
   const existing = await findRelatedNote(text, title, deps.vault);
   const stamp = deps.vault.currentDateTime();
+  const tags = extractTags(text);
 
   if (existing) {
     const block = `## ${stamp}\n\n${text.trim()}\n`;
     const result = await deps.vault.appendNote(existing, block, { source: "fallback" });
+    if (tags.length > 0) {
+      await applyTags(deps.vault, result.relativePath, tags);
+    }
     return {
       status: `📥 Добавил запись в «${result.title}»`,
       action: "append",
@@ -99,10 +112,14 @@ async function fallbackWrite(
       path: result.relativePath,
       usedFallback: true,
       agentText,
+      block: normalizeDashes(block),
     };
   }
 
   const result = await deps.vault.createNoteFromTitle(title, text.trim(), "fallback");
+  if (tags.length > 0) {
+    await applyTags(deps.vault, result.relativePath, tags);
+  }
   return {
     status: `📝 Создал заметку «${result.title}»`,
     action: "create",
@@ -111,6 +128,25 @@ async function fallbackWrite(
     usedFallback: true,
     agentText,
   };
+}
+
+/**
+ * Puts the tags of the message into the frontmatter of the note. The agent
+ * may or may not have done it, so the tags are added here as well: the note
+ * always carries them.
+ */
+async function applyTags(
+  vault: VaultOperations,
+  relativePath: string,
+  tags: string[],
+): Promise<void> {
+  const file = await vault.readFile(relativePath).catch(() => null);
+  if (!file) return;
+  const merged = mergeTags(file.content, tags, vault.currentDate());
+  if (merged === file.content) return;
+  await vault
+    .writeNote(relativePath, merged, { source: "agent", autoLink: false })
+    .catch(() => undefined);
 }
 
 /** Looks for a note that is about the same topic as the message. */

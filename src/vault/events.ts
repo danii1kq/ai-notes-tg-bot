@@ -11,6 +11,10 @@ export interface VaultEvent {
   at: string;
   bytes: number;
   source: "agent" | "fallback";
+  /** The appended block, so the append can be undone later. */
+  block?: string;
+  /** The content before an overwrite, so the overwrite can be undone later. */
+  previous?: string;
 }
 
 const MAX_EVENTS = 200;

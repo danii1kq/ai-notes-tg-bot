@@ -19,4 +19,23 @@ export const processedUpdates = sqliteTable("processed_updates", {
   telegramUserId: text("telegram_user_id"),
 });
 
-export const schema = { notesLog, processedUpdates };
+/**
+ * Every write of the bot, kept so it can be undone with /undo: an appended
+ * block, a created note or an overwritten one.
+ */
+export const undoLog = sqliteTable("undo_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  createdAt: text("created_at").notNull(),
+  action: text("action").notNull(),
+  path: text("path").notNull(),
+  title: text("title").notNull(),
+  /** The appended block, for the append. */
+  block: text("block"),
+  /** The content before the write, for the overwrite. */
+  previous: text("previous"),
+  /** When the write was undone. */
+  undoneAt: text("undone_at"),
+  telegramUserId: text("telegram_user_id"),
+});
+
+export const schema = { notesLog, processedUpdates, undoLog };

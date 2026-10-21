@@ -9,6 +9,12 @@ export interface BotDeps {
   onText: (text: string, userId: number, chatId: number) => Promise<void>;
   /** Short status text of the bot, shown for /status. */
   onStatus: (userId: number) => Promise<string>;
+  /** Searches the vault, shown for /search. */
+  onSearch: (query: string, userId: number) => Promise<string>;
+  /** Undoes the last write of the bot, shown for /undo. */
+  onUndo: (userId: number, confirmed: boolean) => Promise<string>;
+  /** Lists the notes of the inbox, shown for /inbox. */
+  onInbox: (userId: number) => Promise<string>;
 }
 
 const HELP = [
@@ -16,10 +22,14 @@ const HELP = [
   "",
   "Просто пришли текст - я найду подходящую заметку или создам новую.",
   "Если нужно проверить факты, я сам полезу в интернет через DuckDuckGo.",
+  "Теги пиши прямо в сообщении: #идея #работа - они попадут в заметку.",
   "",
   "Команды:",
   "/start - это сообщение",
   "/status - что уже записано",
+  "/search запрос - найти заметку по слову",
+  "/inbox - что ещё не разобрано",
+  "/undo - отменить мою последнюю запись",
 ].join("\n");
 
 /**
@@ -60,6 +70,23 @@ export function createBot(deps: BotDeps): Bot {
   bot.command("status", async (ctx) => {
     const status = await deps.onStatus(ctx.from?.id ?? 0);
     await ctx.reply(status);
+  });
+
+  bot.command("search", async (ctx) => {
+    const query = ctx.match?.trim() ?? "";
+    const result = await deps.onSearch(query, ctx.from?.id ?? 0);
+    await ctx.reply(result);
+  });
+
+  bot.command("inbox", async (ctx) => {
+    const result = await deps.onInbox(ctx.from?.id ?? 0);
+    await ctx.reply(result);
+  });
+
+  bot.command("undo", async (ctx) => {
+    const confirmed = (ctx.match ?? "").trim().toLowerCase() === "confirm";
+    const result = await deps.onUndo(ctx.from?.id ?? 0, confirmed);
+    await ctx.reply(result);
   });
 
   bot.on("message:text", async (ctx) => {

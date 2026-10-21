@@ -5,6 +5,7 @@ import type { Logger } from "../logger.js";
 import { appendEvent, type VaultEvent } from "./events.js";
 import type { VaultGuard, WriteResult } from "./guard.js";
 import { noteFileName, resolveInsideVault, toRelative } from "./paths.js";
+import { parseTags } from "./tags.js";
 
 export interface NoteInfo {
   relativePath: string;
@@ -160,6 +161,13 @@ export class VaultOperations {
     };
   }
 
+  /** When a note was changed the last time, and how big it is. */
+  async statOf(targetPath: string): Promise<{ mtimeMs: number; size: number } | null> {
+    const absolute = resolveInsideVault(this.vaultRoot, targetPath);
+    const info = await stat(absolute).catch(() => null);
+    return info ? { mtimeMs: info.mtimeMs, size: info.size } : null;
+  }
+
   /**
    * Creates or overwrites a note. New notes always start with the Obsidian
    * YAML frontmatter and every mention of an existing note becomes a wiki link.
@@ -175,8 +183,13 @@ export class VaultOperations {
     const linked = autoLinkEntities(normalizeDashes(content), titles, selfTitle);
     const withFrontmatter = ensureFrontmatter(linked, this.currentDate());
 
+    // The old content is kept, so an overwrite can be undone later.
+    const previous = await readFile(absolute, "utf8").catch(() => undefined);
+
     const result = await this.deps.guard.write(absolute, withFrontmatter);
-    await this.record(result, options.source ?? "agent");
+    await this.record(result, options.source ?? "agent", {
+      previous: result.action === "overwrite" ? previous : undefined,
+    });
     return result;
   }
 
@@ -187,9 +200,56 @@ export class VaultOperations {
     options: { source?: VaultEvent["source"] } = {},
   ): Promise<WriteResult> {
     const absolute = resolveInsideVault(this.vaultRoot, targetPath);
-    const result = await this.deps.guard.append(absolute, normalizeDashes(block));
-    await this.record(result, options.source ?? "agent");
+    const normalized = normalizeDashes(block);
+    const result = await this.deps.guard.append(absolute, normalized);
+    await this.record(result, options.source ?? "agent", { block: normalized });
     return result;
+  }
+
+  /**
+   * Removes the last occurrence of a block from a note. It is the way back
+   * after a wrong append, so the rest of the note stays untouched.
+   */
+  async removeBlock(
+    targetPath: string,
+    block: string,
+  ): Promise<{ removed: boolean; relativePath: string }> {
+    const absolute = resolveInsideVault(this.vaultRoot, targetPath);
+    const relativePath = toRelative(this.vaultRoot, absolute);
+    const current = await readFile(absolute, "utf8").catch(() => "");
+    const index = current.lastIndexOf(block);
+    if (index < 0) return { removed: false, relativePath };
+
+    const next = `${current.slice(0, index)}${current.slice(index + block.length)}`.replace(
+      /\s+$/,
+      "",
+    );
+    await this.deps.guard.write(absolute, next);
+    return { removed: true, relativePath };
+  }
+
+  /** Deletes a note of the vault. */
+  async deleteNote(targetPath: string): Promise<{ removed: boolean; relativePath: string }> {
+    const absolute = resolveInsideVault(this.vaultRoot, targetPath);
+    const result = await this.deps.guard.remove(absolute);
+    return { removed: result.removed, relativePath: result.relativePath };
+  }
+
+  /** Notes that carry a tag in their frontmatter, the newest first. */
+  async listByTag(tag: string): Promise<NoteInfo[]> {
+    const wanted = tag.trim().toLowerCase();
+    if (!wanted) return [];
+
+    const notes = await this.listNotes();
+    const matched: NoteInfo[] = [];
+    for (const note of notes) {
+      const content = await readFile(path.join(this.vaultRoot, note.relativePath), "utf8").catch(
+        () => "",
+      );
+      const tags = parseTags(content).map((value) => value.toLowerCase());
+      if (tags.includes(wanted)) matched.push(note);
+    }
+    return matched;
   }
 
   /** Creates a note from a title, used by the fallback path. */
@@ -223,7 +283,11 @@ export class VaultOperations {
     }).format(new Date());
   }
 
-  private async record(result: WriteResult, source: VaultEvent["source"]): Promise<void> {
+  private async record(
+    result: WriteResult,
+    source: VaultEvent["source"],
+    extra: { block?: string; previous?: string } = {},
+  ): Promise<void> {
     const event: VaultEvent = {
       action: result.action,
       path: result.relativePath,
@@ -231,6 +295,8 @@ export class VaultOperations {
       at: new Date().toISOString(),
       bytes: result.bytes,
       source,
+      ...(extra.block ? { block: extra.block } : {}),
+      ...(extra.previous !== undefined ? { previous: extra.previous } : {}),
     };
     try {
       await appendEvent(this.deps.eventsFile, event);

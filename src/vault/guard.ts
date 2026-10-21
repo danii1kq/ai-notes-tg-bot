@@ -114,6 +114,35 @@ export class VaultGuard {
     return this.runWithRetry(absolute, payload, "append");
   }
 
+  /**
+   * Deletes a file of the vault.
+   *
+   * The file is moved out of the way first and removed afterwards, so a reader
+   * that has the note open never sees it disappear in the middle of a read.
+   */
+  async remove(targetPath: string): Promise<{ removed: boolean; relativePath: string }> {
+    const absolute = resolveInsideVault(this.vaultRoot, targetPath);
+    const relativePath = toRelative(this.vaultRoot, absolute);
+    if (!(await this.exists(absolute))) {
+      return { removed: false, relativePath };
+    }
+
+    await this.settle(absolute);
+    const trash = path.join(
+      path.dirname(absolute),
+      `.${path.basename(absolute)}.${randomBytes(6).toString("hex")}.deleted`,
+    );
+    try {
+      await rename(absolute, trash);
+    } catch (error) {
+      if (!isTransient(error)) throw error;
+      await rm(absolute, { force: true });
+      return { removed: true, relativePath };
+    }
+    await rm(trash, { force: true });
+    return { removed: true, relativePath };
+  }
+
   private async runWithRetry(
     absolute: string,
     payload: string,

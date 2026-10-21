@@ -30,6 +30,20 @@ everywhere and are never locked by the bot.
 Only the owner of the bot is allowed to use it: every message from another
 user id is dropped without an answer.
 
+### Commands
+
+| Command | What it does |
+| --- | --- |
+| `/start`, `/help` | the short description of the bot |
+| `/status` | the last notes the bot wrote |
+| `/search coffee` | searches the vault by the name of a note and by the text inside the notes |
+| `/inbox` | lists the notes that still carry the `inbox` tag |
+| `/undo` | undoes the last write of the bot: an appended block is removed, an overwritten note gets its old content back, a created note is deleted |
+| `/undo confirm` | deletes a created note that was changed after the bot wrote it |
+
+Tags are written in the message itself: `#idea #work` end up in the
+`tags` field of the frontmatter of the note, next to `inbox` and `telegram`.
+
 ### How the notes stay safe
 
 The vault is synchronised by Syncthing while the agent writes into it, so a
@@ -182,6 +196,20 @@ node dist/selftest.js "an idea for a business"
 - Бот отвечает одной короткой строкой: `Создал заметку "Идеи для бизнеса"`.
 
 Бот работает только для владельца: сообщения с чужих id молча игнорируются.
+
+### Команды
+
+| Команда | Что делает |
+| --- | --- |
+| `/start`, `/help` | короткое описание бота |
+| `/status` | последние записанные заметки |
+| `/search кофе` | ищет по названию заметки и по тексту внутри заметок |
+| `/inbox` | показывает заметки с тегом `inbox` |
+| `/undo` | отменяет последнюю запись бота: дописанный блок убирается, перезаписанная заметка получает прежнее содержимое, созданная заметка удаляется |
+| `/undo confirm` | удаляет созданную заметку, которую меняли после записи бота |
+
+Теги пишутся прямо в сообщении: `#идея #работа` попадают в поле `tags`
+фронтматтера заметки рядом с `inbox` и `telegram`.
 
 ### Почему заметки не теряются
 
