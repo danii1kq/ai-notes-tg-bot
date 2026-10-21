@@ -1,6 +1,6 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import type { Database } from "../db/index.js";
-import { undoLog } from "../db/schema.js";
+import { dailySummaries, notesLog, undoLog } from "../db/schema.js";
 import type { Logger } from "../logger.js";
 import type { VaultOperations } from "../vault/operations.js";
 
@@ -8,6 +8,20 @@ export interface ActionDeps {
   vault: VaultOperations;
   db: Database["db"];
   logger: Logger;
+}
+
+export interface StatusDeps {
+  vault: VaultOperations;
+  db: Database["db"];
+  /** The model of the agent and the model of the reserve. */
+  model: string;
+  fallbackModel: string;
+  /** The number of the messages that wait in the queue. */
+  queueSize: number;
+  /** How long the bot is running, in milliseconds. */
+  uptimeMs: number;
+  /** The current time of the owner. */
+  now: string;
 }
 
 /** The notes that wait for a confirmation of the owner. */
@@ -120,6 +134,54 @@ async function markUndone(deps: ActionDeps, id: number): Promise<void> {
     .update(undoLog)
     .set({ undoneAt: new Date().toISOString() })
     .where(eq(undoLog.id, id));
+}
+/**
+ * The state of the bot: the model, the notes, the queue and the last summary
+ * of the day.
+ */
+export async function buildStatus(deps: StatusDeps): Promise<string> {
+  const total = await deps.db.select({ value: count() }).from(notesLog);
+  const notes = await deps.db.select().from(notesLog).orderBy(desc(notesLog.id)).limit(5);
+  const summaries = await deps.db
+    .select()
+    .from(dailySummaries)
+    .orderBy(desc(dailySummaries.date))
+    .limit(1);
+
+  const vaultNotes = await deps.vault.listNotes();
+  const bytes = vaultNotes.reduce((sum, note) => sum + note.size, 0);
+
+  const lines = [
+    `📊 Бот работает ${uptime(deps.uptimeMs)}`,
+    `• Модель: ${deps.model}${deps.fallbackModel ? ` (резерв ${deps.fallbackModel})` : ""}`,
+    `• Заметок: ${total[0]?.value ?? 0} (в хранилище ${vaultNotes.length}, ${formatBytes(bytes)})`,
+    `• В очереди: ${deps.queueSize}`,
+    `• Последний итог: ${summaries[0]?.date ?? "ещё нет"}`,
+    `• Время: ${deps.now}`,
+  ];
+
+  if (notes.length > 0) {
+    lines.push("", "Последние записи:");
+    for (const note of notes) lines.push(`• ${note.title} (${note.action})`);
+  }
+  return lines.join("\n");
+}
+
+/** The uptime of the bot in a readable form. */
+function uptime(milliseconds: number): string {
+  const minutes = Math.floor(milliseconds / 60_000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days} д ${hours % 24} ч`;
+  if (hours > 0) return `${hours} ч ${minutes % 60} мин`;
+  return `${minutes} мин`;
+}
+
+/** The size of the vault in a readable form. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
 /** True when the file was changed after the bot wrote it. */

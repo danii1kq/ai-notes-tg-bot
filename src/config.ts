@@ -13,6 +13,12 @@ const envSchema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(10, "TELEGRAM_BOT_TOKEN is required"),
   /** Comma separated list of Telegram user ids allowed to talk to the bot. */
   ALLOWED_TELEGRAM_ID: z.string().min(1, "ALLOWED_TELEGRAM_ID is required"),
+  /** How the bot receives the messages: long polling or a webhook. */
+  TELEGRAM_MODE: z.enum(["polling", "webhook"]).default("polling"),
+  /** The public https address of the webhook, for the webhook mode. */
+  TELEGRAM_WEBHOOK_URL: z.string().default(""),
+  /** The secret that Telegram sends with every webhook call. */
+  TELEGRAM_WEBHOOK_SECRET: z.string().default(""),
 
   // --- Obsidian vault -----------------------------------------------------
   OBSIDIAN_VAULT_PATH: z.string().min(1, "OBSIDIAN_VAULT_PATH is required"),
@@ -61,6 +67,9 @@ export type AppConfig = {
   telegram: {
     botToken: string;
     allowedUserIds: Set<number>;
+    mode: "polling" | "webhook";
+    webhookUrl: string;
+    webhookSecret: string;
   };
   vault: {
     path: string;
@@ -152,6 +161,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     telegram: {
       botToken: raw.TELEGRAM_BOT_TOKEN,
       allowedUserIds,
+      mode: raw.TELEGRAM_MODE,
+      webhookUrl: raw.TELEGRAM_WEBHOOK_URL,
+      webhookSecret: raw.TELEGRAM_WEBHOOK_SECRET,
     },
     vault: {
       path: raw.OBSIDIAN_VAULT_PATH,

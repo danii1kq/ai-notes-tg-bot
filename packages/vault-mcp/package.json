@@ -1,0 +1,30 @@
+{
+  "name": "@danii1kq/vault-mcp",
+  "version": "0.1.0",
+  "description": "The MCP server of an Obsidian vault with the writes that are safe for Syncthing",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "vault-mcp": "dist/packages/vault-mcp/src/main.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "obsidian",
+    "syncthing",
+    "model-context-protocol"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

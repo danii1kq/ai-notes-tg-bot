@@ -1,0 +1,54 @@
+name: Bug report
+description: Something does not work as it should
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect and what happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to repeat it
+      description: The steps that lead to the problem.
+      placeholder: |
+        1. Send the message "..."
+        2. Wait for the answer
+        3. The note is not there
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: The version of the project
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: The version of Node.js
+      placeholder: 22
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: The part of the log where the problem shows up
+      render: shell
+      description: The lines around the error, without the secrets.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: The checks
+      options:
+        - label: The log has no token and no key of the model in it
+          required: true

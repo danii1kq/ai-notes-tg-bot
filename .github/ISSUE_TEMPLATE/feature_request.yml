@@ -1,0 +1,27 @@
+name: Feature request
+description: An idea for the project
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should the bot be able to do?
+      description: The problem you want to solve, not only the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: use
+    attributes:
+      label: How would you use it?
+      description: A short example of the use.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: The checks
+      options:
+        - label: The idea works without a new secret
+        - label: The idea can be implemented without a big change of the architecture

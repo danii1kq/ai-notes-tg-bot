@@ -1,8 +1,8 @@
 import { mkdir } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
 import type { Bot } from "grammy";
-import { listInbox, searchNotes, undoLast } from "./bot/actions.js";
+import { buildStatus, listInbox, searchNotes, undoLast } from "./bot/actions.js";
 import { createBot } from "./bot/bot.js";
 import { MessageQueue } from "./bot/queue.js";
 import { loadConfig } from "./config.js";
@@ -25,6 +25,7 @@ import { VaultWatcher } from "./vault/watcher.js";
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config.logLevel, "bot");
+  const startedAt = Date.now();
 
   logger.info("starting", {
     vault: config.vault.path,
@@ -172,12 +173,16 @@ async function main(): Promise<void> {
         }
       });
     },
-    onStatus: async () => {
-      const rows = await db.select().from(notesLog).orderBy(notesLog.id).limit(5);
-      if (rows.length === 0) return "Пока ничего не записано.";
-      const lines = rows.map((row) => `• ${row.title} (${row.action})`);
-      return `Последние записи:\n${lines.join("\n")}`;
-    },
+    onStatus: async () =>
+      buildStatus({
+        vault,
+        db,
+        model: config.hermes.model,
+        fallbackModel: config.hermes.fallbackModel,
+        queueSize: queue.size,
+        uptimeMs: Date.now() - startedAt,
+        now: vault.currentDateTime(),
+      }),
     onSearch: async (query, _userId) =>
       searchNotes(query, { vault, db, logger: logger.child("actions") }),
     onUndo: async (userId, confirmed) =>
@@ -233,7 +238,15 @@ async function main(): Promise<void> {
   });
 
   const healthServer = createServer((request, response) => {
-    if (request.url === "/health") {
+    const url = new URL(request.url ?? "/", "http://localhost");
+
+    // The webhook of Telegram: the updates arrive here.
+    if (request.method === "POST" && url.pathname === "/webhook") {
+      void handleWebhook(request, response);
+      return;
+    }
+
+    if (url.pathname === "/health") {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ ok: true, service: "telegram-to-obsidian-ai-agent" }));
       return;
@@ -244,6 +257,28 @@ async function main(): Promise<void> {
       response.end(JSON.stringify({ ok: false }));
     });
   });
+
+  /** Takes the update of Telegram and gives it to the bot. */
+  async function handleWebhook(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const secret = request.headers["x-telegram-bot-api-secret-token"];
+    if (config.telegram.webhookSecret && secret !== config.telegram.webhookSecret) {
+      logger.warn("a webhook call came with a wrong secret");
+      response.writeHead(403).end("forbidden");
+      return;
+    }
+
+    try {
+      const body = await readBody(request);
+      const update = JSON.parse(body) as Parameters<typeof bot.handleUpdate>[0];
+      await bot.handleUpdate(update);
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ ok: true }));
+    } catch (error) {
+      logger.error("the webhook call failed", { error: String(error) });
+      response.writeHead(400, { "content-type": "application/json" });
+      response.end(JSON.stringify({ ok: false }));
+    }
+  }
   await new Promise<void>((resolve) => {
     healthServer.listen(config.health.port, config.health.host, () => {
       logger.info("health endpoint listening", {
@@ -266,10 +301,21 @@ async function main(): Promise<void> {
   process.on("SIGINT", () => void stop("SIGINT"));
   process.on("SIGTERM", () => void stop("SIGTERM"));
 
-  await bot.start({
-    onStart: (info) => logger.info("the bot is polling Telegram", { username: info.username }),
-    drop_pending_updates: true,
-  });
+  if (config.telegram.mode === "webhook" && config.telegram.webhookUrl) {
+    await bot.init();
+    await bot.api.setWebhook(config.telegram.webhookUrl, {
+      secret_token: config.telegram.webhookSecret || undefined,
+      allowed_updates: ["message"],
+    });
+    logger.info("the bot waits for the updates on the webhook", {
+      url: config.telegram.webhookUrl,
+    });
+  } else {
+    await bot.start({
+      onStart: (info) => logger.info("the bot is polling Telegram", { username: info.username }),
+      drop_pending_updates: true,
+    });
+  }
 
   // The button of the chat menu opens the Mini App with the notes.
   if (config.miniApp.url) {
@@ -302,3 +348,13 @@ main().catch((error) => {
   );
   process.exit(1);
 });
+
+/** Reads the body of a request. */
+function readBody(request: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    request.on("error", reject);
+  });
+}

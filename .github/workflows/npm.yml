@@ -1,0 +1,30 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: The dependencies
+        run: |
+          npm ci
+          npm ci --prefix packages/vault-mcp
+
+      - name: The build of the package
+        run: npm run build --prefix packages/vault-mcp
+
+      - name: Publish
+        run: npm publish --prefix packages/vault-mcp --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
