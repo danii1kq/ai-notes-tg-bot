@@ -107,9 +107,11 @@ export class VaultOperations {
     const detailed: DetailedNote[] = [];
 
     for (const note of notes.slice(0, limit)) {
-      const content = await readFile(path.join(this.vaultRoot, note.relativePath), "utf8").catch(
-        () => "",
-      );
+      const info = await stat(path.join(this.vaultRoot, note.relativePath)).catch(() => null);
+      const content =
+        info && info.size > MAX_SCANNED_BYTES
+          ? ""
+          : await readFile(path.join(this.vaultRoot, note.relativePath), "utf8").catch(() => "");
       const fields = parseFrontmatter(content);
       detailed.push({
         ...note,

@@ -161,10 +161,12 @@ export function createMiniApp(options: MiniAppOptions) {
   }
 
   async function serveStatic(response: ServerResponse, pathname: string): Promise<void> {
+    const root = path.resolve(webRoot);
     const relative =
       pathname === "/" || pathname === "/app" ? "index.html" : pathname.replace(/^\/app\//, "");
-    const target = path.resolve(webRoot, relative);
-    if (!target.startsWith(path.resolve(webRoot))) {
+    const target = path.resolve(root, relative);
+    const inside = path.relative(root, target);
+    if (inside.startsWith("..") || path.isAbsolute(inside)) {
       sendJson(response, 403, { ok: false, error: "forbidden" });
       return;
     }
