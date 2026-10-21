@@ -104,7 +104,9 @@ set_url() {
 }
 
 start_tunnel() {
-  if pgrep -f "cloudflared tunnel --url" >/dev/null 2>&1; then
+  # The check is on the port of the app: another project on the server may
+  # have a tunnel of its own.
+  if pgrep -f "cloudflared.*127.0.0.1:${PORT}" >/dev/null 2>&1; then
     log "the tunnel is already running"
     return 0
   fi
