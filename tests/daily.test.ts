@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSummaryPrompt,
   cleanSummary,
+  revertStrayWrites,
   runDailySummary,
   writeSection,
 } from "../src/daily/summary.js";
@@ -20,6 +21,7 @@ import { createDatabase } from "../src/db/index.js";
 import { notesLog } from "../src/db/schema.js";
 import type { HermesClient } from "../src/hermes/client.js";
 import { createLogger } from "../src/logger.js";
+import { readEvents } from "../src/vault/events.js";
 import { VaultGuard } from "../src/vault/guard.js";
 import { VaultOperations } from "../src/vault/operations.js";
 
@@ -133,6 +135,28 @@ describe("writeSection", () => {
 
     const content = await readFile(path.join(vaultPath, "october_2026.md"), "utf8");
     expect(content.indexOf("## 2026-10-21")).toBeLessThan(content.indexOf("## 2026-10-22"));
+  });
+});
+
+describe("revertStrayWrites", () => {
+  it("takes back the writes of the agent", async () => {
+    const { root, vaultPath, vault } = await makeWorld();
+    const eventsFile = path.join(root, "events.json");
+
+    await vault.writeNote("Идеи.md", "мысль");
+    const events = await readEvents(eventsFile);
+    const last = events[events.length - 1];
+    const since = Date.parse(last?.at ?? new Date().toISOString()) + 1;
+
+    // The agent writes a note while it should only answer with a text.
+    await vault.writeNote("Дневник.md", "вывод агента");
+
+    const reverted = await revertStrayWrites(vault, eventsFile, since);
+    expect(reverted).toBe(1);
+
+    await expect(readFile(path.join(vaultPath, "Дневник.md"), "utf8")).rejects.toThrow();
+    const kept = await readFile(path.join(vaultPath, "Идеи.md"), "utf8");
+    expect(kept).toContain("мысль");
   });
 });
 

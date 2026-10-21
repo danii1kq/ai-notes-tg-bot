@@ -4,6 +4,7 @@ import type { Database } from "../db/index.js";
 import { dailySummaries, notesLog } from "../db/schema.js";
 import type { HermesClient } from "../hermes/client.js";
 import type { Logger } from "../logger.js";
+import { readEvents } from "../vault/events.js";
 import { normalizeDashes, type VaultOperations } from "../vault/operations.js";
 import { localDate, localDayStartMs, monthFileName, monthTitle, previousDay } from "./time.js";
 
@@ -33,6 +34,48 @@ interface DayNote {
 
 const MAX_EXCERPT = 700;
 
+/** The pause before the writes of the agent are looked at, in milliseconds. */
+const STRAY_WRITE_GRACE_MS = 2500;
+
+/**
+ * Undoes the writes the agent did while it made the summary.
+ *
+ * The agent has the tools of the vault, so it can write a note even when it
+ * was only asked for a text. Every write of the run is taken back here.
+ */
+export async function revertStrayWrites(
+  vault: VaultOperations,
+  eventsFile: string,
+  since: number,
+): Promise<number> {
+  const events = await readEvents(eventsFile);
+  const stray = events.filter((event) => Date.parse(event.at) >= since);
+  let reverted = 0;
+
+  for (const event of [...stray].reverse()) {
+    try {
+      if (event.action === "append" && event.block) {
+        await vault.removeBlock(event.path, event.block);
+        reverted += 1;
+      } else if (event.action === "overwrite" && event.previous !== undefined) {
+        await vault.writeNote(event.path, event.previous, { source: "agent", autoLink: false });
+        reverted += 1;
+      } else if (event.action === "create") {
+        await vault.deleteNote(event.path);
+        reverted += 1;
+      }
+    } catch {
+      // The file is gone or locked, the next write will not find it anyway.
+    }
+  }
+  return reverted;
+}
+
+/** Waits a moment. */
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 /**
  * Makes the summary of a day and writes it into the file of the month.
  *
@@ -57,10 +100,27 @@ export async function runDailySummary(deps: DailyDeps, day: string): Promise<Dai
   }
 
   const prompt = buildSummaryPrompt(day, notes);
+  const startedAt = Date.now();
   const run = await deps.hermes.run(prompt, { toolsets: "safe" });
   if (!run.ok) {
     deps.logger.error("the agent did not make the summary", { day, error: run.error });
     return null;
+  }
+
+  // The agent of the summary may write into the vault, it must not: the only
+  // file the summary changes is the file of the month. Every write of the
+  // agent is undone here.
+  await sleep(STRAY_WRITE_GRACE_MS);
+  const reverted = await revertStrayWrites(
+    deps.vault,
+    deps.config.vault.eventsFile,
+    startedAt - 1000,
+  );
+  if (reverted > 0) {
+    deps.logger.warn("the agent wrote into the vault, the writes were undone", {
+      day,
+      reverted,
+    });
   }
 
   const summary = cleanSummary(run.text);
@@ -175,7 +235,7 @@ export function buildSummaryPrompt(day: string, notes: DayNote[]): string {
     "Напиши короткий вывод (2-6 предложений) о том, что было сделано за этот день:",
     "над чем шла работа, какие решения приняты, какие идеи появились.",
     "Пиши по-русски, обычным текстом: без заголовков, без списков, без длинных тире.",
-    "Ответь только текстом вывода.",
+    "Ничего не записывай в хранилище, ответь только текстом вывода.",
   ].join("\n");
 }
 
