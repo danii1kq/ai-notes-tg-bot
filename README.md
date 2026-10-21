@@ -6,6 +6,10 @@ is the brain, and the vault is the memory. The vault is synchronised between
 the server and your laptop with Syncthing, so the notes are available
 everywhere and are never locked by the bot.
 
+The bot also keeps a small web app inside Telegram, so the notes can be read
+from the phone without opening Obsidian, and it writes a summary of every day
+into the file of the month.
+
 **English** | [Русский](#русский)
 
 ---
@@ -29,6 +33,10 @@ everywhere and are never locked by the bot.
 - A file that comes with the message (a photo, a document, a video, a voice
   message) is saved into the `attachments` folder of the vault and embedded
   into the note as `![[2026-10-22_photo_abc.jpg]]`.
+- At midnight the agent writes a summary of the day into the file of the month,
+  and the summary comes to the chat as well.
+- The notes are a small web app inside Telegram: the button in the menu of the
+  chat opens the list of the notes, the search and the reading of a note.
 
 Only the owner of the bot is allowed to use it: every message from another
 user id is dropped without an answer.
@@ -87,6 +95,11 @@ guard:
   meantime, the write is repeated, and for an append the existing content is
   never lost,
 - Syncthing conflict copies (`*.sync-conflict-*`) are reported.
+
+The paths of the tools are resolved against the root of the vault, so a tool
+call of the agent cannot write outside of it. The agent of the daily summary
+gets the same tools, but every write it does is taken back: only the file of
+the month is changed by the summary.
 
 ### Stack
 
@@ -245,6 +258,21 @@ npm run typecheck
 npm run build
 ```
 
+The frontend of the Mini App lives in `web/`:
+
+```bash
+cd web
+npm install
+npm run dev     # the dev server on the port 5173
+npm run build
+```
+
+The MCP server of the vault is a package of its own, it is built like this:
+
+```bash
+npm run build --prefix packages/vault-mcp
+```
+
 The bot needs a Telegram token, a model key and the Hermes Agent binary. The
 smoke test of a deployment runs the whole pipeline without Telegram:
 
@@ -252,12 +280,28 @@ smoke test of a deployment runs the whole pipeline without Telegram:
 node dist/selftest.js "an idea for a business"
 ```
 
+### The project
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) - how to work with the project, the rules
+  of the code and the commits.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - the rules of the behaviour.
+- [SECURITY.md](SECURITY.md) - how to report a problem with the security.
+- [CHANGELOG.md](CHANGELOG.md) - what changed in every version.
+- The releases are made with a tag: the workflow builds the image, puts it in
+  the registry of GitHub and publishes the notes of the release.
+
 ### Security
 
 - The bot answers only the ids from `ALLOWED_TELEGRAM_ID`.
 - The keys live in `deploy/.env` on the server, the file is not in git.
 - The model key is injected by the local proxy, the agent never sees it.
 - The MCP tools cannot write outside of the vault.
+- The API of the Mini App checks the signed data of Telegram with the token of
+  the bot, outside of Telegram it needs the token of the owner.
+- The webhook of the bot checks the secret that Telegram sends with every
+  call.
+- The files of the owner are stored in the vault, the bot never sends them
+  anywhere.
 
 ---
 
@@ -279,6 +323,10 @@ node dist/selftest.js "an idea for a business"
 - Файл, который пришёл вместе с сообщением (фото, документ, видео, голосовое),
   сохраняется в папку `attachments` хранилища и вставляется в заметку как
   `![[2026-10-22_photo_abc.jpg]]`.
+- В полночь агент пишет вывод за день в файл месяца, и этот вывод приходит
+  ещё и в чат.
+- Заметки доступны как маленькое веб-приложение внутри Telegram: кнопка в
+  меню чата открывает список заметок, поиск и чтение заметки.
 
 Бот работает только для владельца: сообщения с чужих id молча игнорируются.
 
@@ -332,6 +380,10 @@ tags: [journal, daily]
 - после записи файл перечитывается: если его успел изменить синхронизатор,
   запись повторяется, а при добавлении текста старое содержимое не теряется;
 - конфликтные копии Syncthing (`*.sync-conflict-*`) показываются в отчёте.
+
+Пути инструментов разрешаются относительно корня хранилища, поэтому агент не
+может записать за его пределы. У агента ночного итога те же инструменты, но
+все его записи откатываются: итог меняет только файл месяца.
 
 ### Стек
 
@@ -490,11 +542,36 @@ npm run typecheck
 npm run build
 ```
 
+Фронтенд мини-приложения лежит в `web/`:
+
+```bash
+cd web
+npm install
+npm run dev     # dev-сервер на порту 5173
+npm run build
+```
+
+MCP-сервер хранилища собирается как отдельный пакет:
+
+```bash
+npm run build --prefix packages/vault-mcp
+```
+
 Проверка всей цепочки без Telegram:
 
 ```bash
 node dist/selftest.js "идея для бизнеса"
 ```
+
+### Проект
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) - как работать с проектом, правила кода
+  и коммитов.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - правила поведения.
+- [SECURITY.md](SECURITY.md) - как сообщить о проблеме с безопасностью.
+- [CHANGELOG.md](CHANGELOG.md) - что менялось в каждой версии.
+- Релизы делаются тегом: workflow собирает образ, кладёт его в реестр GitHub
+  и публикует заметки релиза.
 
 ### Безопасность
 
@@ -502,6 +579,10 @@ node dist/selftest.js "идея для бизнеса"
 - Ключи лежат в `deploy/.env` на сервере, в git их нет.
 - Ключ модели подставляет локальный прокси, агент его не видит.
 - MCP-инструменты не могут писать за пределы хранилища.
+- API мини-приложения проверяет подписанные данные Telegram токеном бота, а
+  вне Telegram требует токен владельца.
+- Webhook бота проверяет секрет, который Telegram шлёт с каждым вызовом.
+- Файлы владельца лежат в хранилище, бот никуда их не отправляет.
 
 ---
 
