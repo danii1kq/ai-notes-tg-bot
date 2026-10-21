@@ -29,7 +29,7 @@ describe("the chain of a message", () => {
       timeZone: "Asia/Almaty",
       logger,
     });
-    const { client, db } = await createDatabase(path.join(root, "app.db"));
+    const { client } = await createDatabase(path.join(root, "app.db"));
 
     // The agent: it looks for a note and writes one.
     const hermes = {

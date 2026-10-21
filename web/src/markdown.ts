@@ -21,7 +21,6 @@ function escapeHtml(text: string): string {
 /** The inline marks of a line of text. */
 function renderInline(text: string, fileToken: string): string {
   const placeholders: string[] = [];
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: the placeholder is exactly what has to be found
   const masked = text.replace(
     // biome-ignore lint/suspicious/noControlCharactersInRegex: the placeholder is exactly what has to be found
     /!\[\[([^\]]+)\]\]|\[\[([^\]]+)\]\]|`([^`]+)`/g,
