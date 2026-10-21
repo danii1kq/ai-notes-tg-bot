@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  # The secrets are not available in the condition of a job, so the check of
+  # the deployment key lives in the environment of the workflow.
+  HAS_DEPLOY_KEY: ${{ secrets.VDS_SSH_KEY != '' }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -30,7 +35,7 @@ jobs:
 
   deploy:
     needs: check
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.VDS_SSH_KEY != ''
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.HAS_DEPLOY_KEY == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
