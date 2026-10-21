@@ -36,6 +36,15 @@ OBSIDIAN_VAULT_PATH=${OBSIDIAN_VAULT_PATH:-/vault}
 EOF
 chmod 600 "$HERMES_HOME/.env"
 
+# --- The agent and the bot ---------------------------------------------------
+# The agent gets no token of Telegram. When the token is in the environment,
+# the agent starts a gateway of its own and polls Telegram with it, and the
+# bot gets a conflict from Telegram. The application needs the token, so it is
+# put back before the start.
+BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+unset TELEGRAM_BOT_TOKEN
+unset ALLOWED_TELEGRAM_ID
+
 # --- Model provider ---------------------------------------------------------
 # The agent talks to a local proxy: it adds the session header the OpenCode Go
 # relay requires and keeps the real key out of the agent configuration.
@@ -78,4 +87,5 @@ hermes mcp list 2>&1 | sed 's/^/[entrypoint] /' || log "warning: could not list 
 
 # --- Start ------------------------------------------------------------------
 log "starting: $*"
+export TELEGRAM_BOT_TOKEN="$BOT_TOKEN"
 exec "$@"

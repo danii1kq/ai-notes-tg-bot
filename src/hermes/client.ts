@@ -92,14 +92,21 @@ export class HermesClient {
       let stderr = "";
       let settled = false;
 
+      // The agent does not need the token of the bot. When the token is in the
+      // environment, the agent starts its own gateway and polls Telegram with
+      // it, and the bot gets a conflict from Telegram.
+      const env: NodeJS.ProcessEnv = {
+        ...this.options.env,
+        NO_COLOR: "1",
+        TERM: "dumb",
+        CI: "1",
+      };
+      delete env.TELEGRAM_BOT_TOKEN;
+      delete env.ALLOWED_TELEGRAM_ID;
+
       const child = spawn(this.options.bin, args, {
         cwd: this.options.workspace,
-        env: {
-          ...this.options.env,
-          NO_COLOR: "1",
-          TERM: "dumb",
-          CI: "1",
-        },
+        env,
         stdio: ["ignore", "pipe", "pipe"],
       });
 
