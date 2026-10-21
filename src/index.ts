@@ -13,7 +13,7 @@ import { createDatabase } from "./db/index.js";
 import { notesLog, undoLog } from "./db/schema.js";
 import { HermesClient } from "./hermes/client.js";
 import { createLlmProxy } from "./llm/proxy.js";
-import { createLogger } from "./logger.js";
+import { createLogger, type Logger } from "./logger.js";
 import { createMiniApp } from "./miniapp/api.js";
 import { setMenuButton } from "./miniapp/menu.js";
 import { type ProcessResult, processMessage } from "./pipeline.js";
@@ -335,10 +335,34 @@ async function main(): Promise<void> {
       url: config.telegram.webhookUrl,
     });
   } else {
-    await bot.start({
-      onStart: (info) => logger.info("the bot is polling Telegram", { username: info.username }),
-      drop_pending_updates: true,
-    });
+    await startPolling(bot, logger);
+  }
+}
+
+/**
+ * Polls Telegram for the updates.
+ *
+ * Telegram answers with a conflict when another instance of the same bot is
+ * still asking for the updates, for example right after the restart of the
+ * container. The bot waits and asks again instead of falling down.
+ */
+async function startPolling(bot: Bot, logger: Logger): Promise<void> {
+  let first = true;
+
+  for (;;) {
+    try {
+      await bot.start({
+        onStart: (info) => logger.info("the bot is polling Telegram", { username: info.username }),
+        drop_pending_updates: first,
+      });
+      return;
+    } catch (error) {
+      logger.error("the connection to telegram failed, trying again in 15 s", {
+        error: String(error),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 15_000));
+      first = false;
+    }
   }
 }
 
