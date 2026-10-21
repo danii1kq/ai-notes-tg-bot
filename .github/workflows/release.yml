@@ -61,16 +61,18 @@ jobs:
         id: notes
         run: |
           VERSION="${{ inputs.tag || github.ref_name }}"
+          # The changelog knows the versions without the v.
+          CHANGELOG_VERSION="${VERSION#v}"
           {
             echo "## The image"
             echo
-            echo '    docker pull ghcr.io/${{ github.repository }}:'"$VERSION"
+            echo "    docker pull ghcr.io/${{ github.repository }}:${VERSION}"
             echo
             echo "## The changes"
             echo
-            awk -v version="$VERSION" '
+            awk -v version="$CHANGELOG_VERSION" '
               $0 ~ "^## \\[" version "\\]" { found = 1; next }
-              found && /^## \\[/ { exit }
+              found && $0 ~ "^## \\[" { exit }
               found { print }
             ' CHANGELOG.md
           } > release-notes.md
