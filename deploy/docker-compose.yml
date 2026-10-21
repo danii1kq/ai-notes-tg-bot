@@ -30,6 +30,10 @@ services:
       HERMES_FALLBACK_MODEL: ${HERMES_FALLBACK_MODEL:-deepseek-v4.1-flash}
       LLM_PROVIDER_BASE_URL: ${LLM_PROVIDER_BASE_URL:-https://opencode.ai/zen/go/v1}
       LLM_PROXY_PORT: ${LLM_PROXY_PORT:-11434}
+      # The Mini App with the notes and the address of the menu button.
+      WEB_ROOT: /app/web
+      MINI_APP_URL: ${MINI_APP_URL:-}
+      MINI_APP_TOKEN: ${MINI_APP_TOKEN:-}
     volumes:
       # The same folder is mounted into the agent and into Syncthing.
       - ${VAULT_HOST_PATH:-/opt/obsidian-vault}:/vault
@@ -37,6 +41,8 @@ services:
     ports:
       # The health endpoint is only reachable from the host.
       - "127.0.0.1:${HEALTH_PORT:-8090}:8080"
+      # The Mini App is open from the internet, the API checks every request.
+      - "${MINI_APP_PORT:-8091}:8080"
     healthcheck:
       test:
         - CMD

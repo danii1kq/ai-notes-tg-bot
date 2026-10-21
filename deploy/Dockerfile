@@ -71,6 +71,18 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
+# --- Mini App build ----------------------------------------------------------
+# The frontend of the Mini App: React and Vite.
+FROM node:22-bookworm-slim AS web-builder
+
+ENV NODE_ENV=development
+
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --include=dev
+COPY web/ ./
+RUN npm run build
+
 # --- Runtime -----------------------------------------------------------------
 FROM base AS runtime
 
@@ -79,6 +91,7 @@ USER root
 WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
+COPY --from=web-builder /web/dist ./web
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
@@ -93,7 +106,8 @@ VOLUME ["/app/data"]
 ENV HERMES_WORKSPACE=/app/hermes-workspace \
     OBSIDIAN_VAULT_PATH=/vault \
     VAULT_EVENTS_FILE=/app/data/vault-events.json \
-    DB_PATH=/app/data/app.db
+    DB_PATH=/app/data/app.db \
+    WEB_ROOT=/app/web
 
 USER node
 EXPOSE 11434

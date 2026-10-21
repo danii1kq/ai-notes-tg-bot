@@ -14,6 +14,8 @@ import { notesLog, undoLog } from "./db/schema.js";
 import { HermesClient } from "./hermes/client.js";
 import { createLlmProxy } from "./llm/proxy.js";
 import { createLogger } from "./logger.js";
+import { createMiniApp } from "./miniapp/api.js";
+import { setMenuButton } from "./miniapp/menu.js";
 import { type ProcessResult, processMessage } from "./pipeline.js";
 import { saveAttachment } from "./vault/attachments.js";
 import { VaultGuard } from "./vault/guard.js";
@@ -222,14 +224,25 @@ async function main(): Promise<void> {
     timeZone: config.vault.timeZone,
   });
 
+  const miniApp = createMiniApp({
+    vault,
+    botToken: config.telegram.botToken,
+    browserToken: config.miniApp.token,
+    logger: logger.child("miniapp"),
+    webRoot: config.miniApp.webRoot,
+  });
+
   const healthServer = createServer((request, response) => {
     if (request.url === "/health") {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({ ok: true, service: "telegram-to-obsidian-ai-agent" }));
       return;
     }
-    response.writeHead(404, { "content-type": "application/json" });
-    response.end(JSON.stringify({ ok: false }));
+    void miniApp(request, response).then((handled) => {
+      if (handled) return;
+      response.writeHead(404, { "content-type": "application/json" });
+      response.end(JSON.stringify({ ok: false }));
+    });
   });
   await new Promise<void>((resolve) => {
     healthServer.listen(config.health.port, config.health.host, () => {
@@ -257,6 +270,16 @@ async function main(): Promise<void> {
     onStart: (info) => logger.info("the bot is polling Telegram", { username: info.username }),
     drop_pending_updates: true,
   });
+
+  // The button of the chat menu opens the Mini App with the notes.
+  if (config.miniApp.url) {
+    try {
+      await setMenuButton({ botToken: config.telegram.botToken, url: config.miniApp.url });
+      logger.info("the menu button opens the mini app", { url: config.miniApp.url });
+    } catch (error) {
+      logger.error("could not set the menu button", { error: String(error) });
+    }
+  }
 
   // The summary of the days that were missed while the bot was down.
   void queue.push(async () => {

@@ -147,6 +147,24 @@ Requirements: a Linux server with Docker and Docker Compose.
 The first build installs Hermes Agent and takes a while. Later builds reuse
 the cached layers.
 
+### The Mini App
+
+The notes are also a small web app inside Telegram. The button in the menu of
+the chat opens it: the list of the notes, the search and the reading of a note
+with its pictures. The app follows the theme of Telegram, so it looks the same
+in the light and in the dark mode.
+
+The data is never given away: the Mini App sends the signed data of Telegram
+and the backend checks it with the token of the bot. Outside of Telegram there
+is no signed data, so the address of the app carries the token of the owner:
+
+```
+https://<your-host>/?token=<MINI_APP_TOKEN>
+```
+
+The frontend lives in `web/`, it is built with Vite and served by the same
+process that runs the bot.
+
 ### Syncthing and your laptop
 
 1. The web interface of Syncthing is on the port 8384 of the server:
@@ -336,6 +354,24 @@ tags: [journal, daily]
    ```
 
 Первая сборка ставит Hermes Agent и идёт долго, дальше используются кэшированные слои.
+
+### Мини-приложение
+
+Заметки доступны ещё и как маленькое веб-приложение внутри Telegram. Кнопка
+в меню чата открывает его: список заметок, поиск и чтение заметки вместе с
+картинками. Приложение следует теме Telegram, поэтому в светлой и в тёмной
+теме выглядит одинаково хорошо.
+
+Данные никому не отдаются: мини-приложение присылает подписанные данные
+Telegram, а бэкенд проверяет их токеном бота. Вне Telegram подписанных данных
+нет, поэтому в адрес приложения добавляется токен владельца:
+
+```
+https://<your-host>/?token=<MINI_APP_TOKEN>
+```
+
+Фронтенд лежит в `web/`, он собирается через Vite и раздаётся тем же
+процессом, который работает ботом.
 
 ### Syncthing и ноутбук
 

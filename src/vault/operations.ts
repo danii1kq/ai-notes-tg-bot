@@ -5,7 +5,7 @@ import type { Logger } from "../logger.js";
 import { appendEvent, type VaultEvent } from "./events.js";
 import type { VaultGuard, WriteResult } from "./guard.js";
 import { noteFileName, resolveInsideVault, toRelative } from "./paths.js";
-import { parseTags } from "./tags.js";
+import { parseFrontmatter, parseTags } from "./tags.js";
 
 export interface NoteInfo {
   relativePath: string;
@@ -19,6 +19,13 @@ export interface SearchHit {
   title: string;
   line?: number;
   snippet?: string;
+}
+
+/** A note with everything the list of the Mini App shows. */
+export interface DetailedNote extends NoteInfo {
+  date: string;
+  tags: string[];
+  snippet: string;
 }
 
 export interface VaultOperationsDeps {
@@ -94,6 +101,26 @@ export class VaultOperations {
     return notes.map((note) => note.title);
   }
 
+  /** The notes with their date, their tags and a short text. */
+  async listNotesDetailed(limit = 60): Promise<DetailedNote[]> {
+    const notes = await this.listNotes();
+    const detailed: DetailedNote[] = [];
+
+    for (const note of notes.slice(0, limit)) {
+      const content = await readFile(path.join(this.vaultRoot, note.relativePath), "utf8").catch(
+        () => "",
+      );
+      const fields = parseFrontmatter(content);
+      detailed.push({
+        ...note,
+        date: fields.date ?? "",
+        tags: parseTags(content),
+        snippet: excerptOf(content),
+      });
+    }
+    return detailed;
+  }
+
   /**
    * Searches the vault. `files` matches note names, `content` matches the
    * text inside the notes. Both accept a glob (`*.md`) or a plain substring.
@@ -166,6 +193,13 @@ export class VaultOperations {
     const absolute = resolveInsideVault(this.vaultRoot, targetPath);
     const info = await stat(absolute).catch(() => null);
     return info ? { mtimeMs: info.mtimeMs, size: info.size } : null;
+  }
+
+  /** Reads a file of the vault as it is, for the attachments. */
+  async readBinary(targetPath: string): Promise<{ relativePath: string; data: Uint8Array }> {
+    const absolute = resolveInsideVault(this.vaultRoot, targetPath);
+    const data = await readFile(absolute);
+    return { relativePath: toRelative(this.vaultRoot, absolute), data };
   }
 
   /**
@@ -344,6 +378,13 @@ export function autoLinkEntities(text: string, titles: string[], selfTitle: stri
     new RegExp(`${PLACEHOLDER}(\\d+)${PLACEHOLDER}`, "g"),
     (_match, index: string) => placeholders[Number(index)] ?? "",
   );
+}
+
+/** The text of a note without the frontmatter, shortened for the list. */
+export function excerptOf(content: string, maxLength = 180): string {
+  const withoutFrontmatter = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+  const text = withoutFrontmatter.replace(/\s+/g, " ").trim();
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
 }
 
 /** Builds a matcher for file names: a glob when the pattern has wildcards. */

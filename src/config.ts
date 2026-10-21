@@ -40,6 +40,14 @@ const envSchema = z.object({
   VAULT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   VAULT_SETTLE_DELAY_MS: z.coerce.number().int().positive().default(1000),
 
+  // --- Mini App -----------------------------------------------------------
+  /** The public address of the Mini App, for the menu button of the bot. */
+  MINI_APP_URL: z.string().default(""),
+  /** The token for the browser: outside of Telegram there is no init data. */
+  MINI_APP_TOKEN: z.string().default(""),
+  /** The folder with the built frontend. */
+  WEB_ROOT: z.string().default("/app/web"),
+
   // --- Misc ---------------------------------------------------------------
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   /** Text sent right after a message is accepted; empty disables the ack. */
@@ -79,6 +87,11 @@ export type AppConfig = {
   };
   db: {
     path: string;
+  };
+  miniApp: {
+    url: string;
+    token: string;
+    webRoot: string;
   };
   logLevel: "debug" | "info" | "warn" | "error";
   botAck: string;
@@ -165,6 +178,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     db: {
       path: raw.DB_PATH,
+    },
+    miniApp: {
+      url: raw.MINI_APP_URL,
+      token: raw.MINI_APP_TOKEN,
+      webRoot: raw.WEB_ROOT,
     },
     logLevel: raw.LOG_LEVEL,
     botAck: raw.BOT_ACK,
