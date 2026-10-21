@@ -31,7 +31,6 @@ rollback() {
     return 1
   fi
   IMAGE_TAG=prev "${COMPOSE[@]}" up -d --no-build --remove-orphans
-  docker image tag "$PREV" "$IMAGE"
   log "The rollback is done"
 }
 
@@ -53,15 +52,19 @@ if docker image inspect "$IMAGE" >/dev/null 2>&1; then
   docker image tag "$IMAGE" "$PREV"
 fi
 
+# The rollback uses the tag :prev, the compose file reads it from the
+# environment.
+export IMAGE_TAG=latest
+
 log "docker compose build"
 "${COMPOSE[@]}" build
 
 log "docker compose up -d"
 "${COMPOSE[@]}" up -d --remove-orphans
 
-log "Waiting for the healthcheck (up to 90 s)"
+log "Waiting for the healthcheck (up to 5 min)"
 healthy=0
-for _ in $(seq 1 45); do
+for _ in $(seq 1 150); do
   status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$CONTAINER" 2>/dev/null || echo missing)"
   case "$status" in
     healthy)

@@ -11,7 +11,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile
-    image: telegram-to-obsidian-ai-agent:latest
+    image: telegram-to-obsidian-ai-agent:${IMAGE_TAG:-latest}
     container_name: telegram-to-obsidian-bot
     restart: unless-stopped
     env_file:
@@ -52,7 +52,9 @@ services:
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      # The entrypoint prepares the Hermes Agent before the app starts, the
+      # first check has to wait for it.
+      start_period: 150s
     depends_on:
       - syncthing
     logging:
