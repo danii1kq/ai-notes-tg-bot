@@ -5,7 +5,7 @@ import { dailySummaries, notesLog } from "../db/schema.js";
 import type { HermesClient } from "../hermes/client.js";
 import type { Logger } from "../logger.js";
 import { normalizeDashes, type VaultOperations } from "../vault/operations.js";
-import { localDayStartMs, localDate, monthFileName, monthTitle, previousDay } from "./time.js";
+import { localDate, localDayStartMs, monthFileName, monthTitle, previousDay } from "./time.js";
 
 export interface DailyDeps {
   config: AppConfig;
@@ -39,10 +39,7 @@ const MAX_EXCERPT = 700;
  * Nothing happens when the owner did not write anything that day: the day is
  * simply missing in the file of the month.
  */
-export async function runDailySummary(
-  deps: DailyDeps,
-  day: string,
-): Promise<DailySummary | null> {
+export async function runDailySummary(deps: DailyDeps, day: string): Promise<DailySummary | null> {
   const notes = await collectNotesOfDay(deps, day);
   if (notes.length === 0) {
     deps.logger.info("no notes that day, the summary is skipped", { day });
@@ -97,10 +94,7 @@ export async function runDailySummaryForYesterday(deps: DailyDeps): Promise<Dail
  * The days are taken from the oldest to the newest, so the sections of the
  * file of the month stay in the right order.
  */
-export async function catchUpDailySummaries(
-  deps: DailyDeps,
-  days = 3,
-): Promise<DailySummary[]> {
+export async function catchUpDailySummaries(deps: DailyDeps, days = 3): Promise<DailySummary[]> {
   const today = localDate(new Date(), deps.config.vault.timeZone);
   const wanted: string[] = [];
   let day = today;
@@ -198,7 +192,10 @@ export function cleanSummary(text: string): string {
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
-  const text2 = lines.join("\n").replace(/^["']|["']$/g, "").trim();
+  const text2 = lines
+    .join("\n")
+    .replace(/^["']|["']$/g, "")
+    .trim();
   return text2.length > 3000 ? `${text2.slice(0, 2997)}...` : text2;
 }
 

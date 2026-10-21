@@ -73,7 +73,14 @@ export function monthTitle(day: string): string {
 /** The offset of a time zone against UTC, in milliseconds. */
 export function timeZoneOffsetMs(date: Date, timeZone: string): number {
   const parts = zonedParts(date, timeZone);
-  const asUtc = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  const asUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  );
   return asUtc - Math.floor(date.getTime() / 1000) * 1000;
 }
 

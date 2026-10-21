@@ -2,7 +2,12 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildSummaryPrompt, cleanSummary, runDailySummary, writeSection } from "../src/daily/summary.js";
+import {
+  buildSummaryPrompt,
+  cleanSummary,
+  runDailySummary,
+  writeSection,
+} from "../src/daily/summary.js";
 import {
   localDate,
   localDayStartMs,
