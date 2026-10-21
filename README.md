@@ -26,6 +26,9 @@ everywhere and are never locked by the bot.
   the agent searches the web through the DuckDuckGo MCP server first and puts
   what it found into the note together with the source link.
 - The bot answers with one short line: `Created note "Business ideas"`.
+- A file that comes with the message (a photo, a document, a video, a voice
+  message) is saved into the `attachments` folder of the vault and embedded
+  into the note as `![[2026-10-22_photo_abc.jpg]]`.
 
 Only the owner of the bot is allowed to use it: every message from another
 user id is dropped without an answer.
@@ -194,6 +197,9 @@ node dist/selftest.js "an idea for a business"
   агент сначала ищет в интернете через MCP-сервер DuckDuckGo и записывает
   найденное в заметку вместе со ссылкой на источник.
 - Бот отвечает одной короткой строкой: `Создал заметку "Идеи для бизнеса"`.
+- Файл, который пришёл вместе с сообщением (фото, документ, видео, голосовое),
+  сохраняется в папку `attachments` хранилища и вставляется в заметку как
+  `![[2026-10-22_photo_abc.jpg]]`.
 
 Бот работает только для владельца: сообщения с чужих id молча игнорируются.
 

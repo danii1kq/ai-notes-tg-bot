@@ -2,6 +2,7 @@ import type { AppConfig } from "./config.js";
 import type { HermesClient } from "./hermes/client.js";
 import { buildPrompt } from "./hermes/prompt.js";
 import type { Logger } from "./logger.js";
+import { embedMarkdown, type SavedAttachment } from "./vault/attachments.js";
 import { readEvents, type VaultEvent } from "./vault/events.js";
 import { normalizeDashes, type VaultOperations } from "./vault/operations.js";
 import { extractTags, mergeTags } from "./vault/tags.js";
@@ -33,16 +34,21 @@ export async function processMessage(
   text: string,
   telegramUserId: number,
   deps: PipelineDeps,
+  options: { attachment?: SavedAttachment } = {},
 ): Promise<ProcessResult> {
   const startedAt = Date.now();
   const titles = await deps.vault.noteTitles();
   const tags = extractTags(text);
+  const attachment = options.attachment;
 
   const prompt = buildPrompt(text, {
     now: new Date(),
     timeZone: deps.config.vault.timeZone,
     vaultPath: deps.config.vault.path,
     noteTitles: titles,
+    ...(attachment
+      ? { attachment: { name: attachment.name, relativePath: attachment.relativePath } }
+      : {}),
   });
 
   deps.logger.info("running the agent", {
@@ -67,6 +73,9 @@ export async function processMessage(
     if (tags.length > 0) {
       await applyTags(deps.vault, last.path, tags);
     }
+    if (attachment) {
+      await ensureEmbed(deps.vault, last.path, attachment);
+    }
     return {
       status: statusFor(last),
       action: last.action,
@@ -85,7 +94,7 @@ export async function processMessage(
     ok: run.ok,
     error: run.error,
   });
-  return fallbackWrite(text, deps, run.text);
+  return fallbackWrite(text, deps, run.text, attachment);
 }
 
 /** Writes the message into the vault without the agent. */
@@ -93,14 +102,16 @@ async function fallbackWrite(
   text: string,
   deps: PipelineDeps,
   agentText: string,
+  attachment?: SavedAttachment,
 ): Promise<ProcessResult> {
   const title = deriveTitle(text);
   const existing = await findRelatedNote(text, title, deps.vault);
   const stamp = deps.vault.currentDateTime();
   const tags = extractTags(text);
+  const embed = attachment ? `\n\n${embedMarkdown(attachment.name)}\n` : "";
 
   if (existing) {
-    const block = `## ${stamp}\n\n${text.trim()}\n`;
+    const block = `## ${stamp}\n\n${text.trim()}${embed}\n`;
     const result = await deps.vault.appendNote(existing, block, { source: "fallback" });
     if (tags.length > 0) {
       await applyTags(deps.vault, result.relativePath, tags);
@@ -116,7 +127,7 @@ async function fallbackWrite(
     };
   }
 
-  const result = await deps.vault.createNoteFromTitle(title, text.trim(), "fallback");
+  const result = await deps.vault.createNoteFromTitle(title, `${text.trim()}${embed}`, "fallback");
   if (tags.length > 0) {
     await applyTags(deps.vault, result.relativePath, tags);
   }
@@ -128,6 +139,22 @@ async function fallbackWrite(
     usedFallback: true,
     agentText,
   };
+}
+
+/**
+ * Makes sure the file of the owner is really in the note. The agent embeds
+ * it by itself, but the file must not be lost when the agent forgets it.
+ */
+async function ensureEmbed(
+  vault: VaultOperations,
+  relativePath: string,
+  attachment: SavedAttachment,
+): Promise<void> {
+  const file = await vault.readFile(relativePath).catch(() => null);
+  if (!file) return;
+  const embed = embedMarkdown(attachment.name);
+  if (file.content.includes(embed)) return;
+  await vault.appendNote(relativePath, `\n${embed}\n`, { source: "agent" }).catch(() => undefined);
 }
 
 /**

@@ -11,7 +11,8 @@ import { notesLog, undoLog } from "./db/schema.js";
 import { HermesClient } from "./hermes/client.js";
 import { createLlmProxy } from "./llm/proxy.js";
 import { createLogger } from "./logger.js";
-import { processMessage } from "./pipeline.js";
+import { type ProcessResult, processMessage } from "./pipeline.js";
+import { saveAttachment } from "./vault/attachments.js";
 import { VaultGuard } from "./vault/guard.js";
 import { VaultOperations } from "./vault/operations.js";
 import { VaultWatcher } from "./vault/watcher.js";
@@ -76,6 +77,29 @@ async function main(): Promise<void> {
 
   const queue = new MessageQueue(logger.child("queue"));
 
+  /** Writes the result of the pipeline into the log of the notes and of the undo. */
+  const record = async (result: ProcessResult, userId: number): Promise<void> => {
+    await db.insert(notesLog).values({
+      createdAt: new Date().toISOString(),
+      action: result.action,
+      path: result.path,
+      title: result.title,
+      source: result.usedFallback ? "fallback" : "agent",
+      bytes: 0,
+      telegramUserId: String(userId),
+    });
+    if (result.action !== "none") {
+      await db.insert(undoLog).values({
+        createdAt: new Date().toISOString(),
+        action: result.action,
+        path: result.path,
+        title: result.title,
+        block: result.block ?? null,
+        telegramUserId: String(userId),
+      });
+    }
+  };
+
   const bot: Bot = createBot({
     config,
     logger: logger.child("telegram"),
@@ -92,29 +116,42 @@ async function main(): Promise<void> {
             logger: logger.child("pipeline"),
           });
           await bot.api.sendMessage(chatId, result.status);
-          await db.insert(notesLog).values({
-            createdAt: new Date().toISOString(),
-            action: result.action,
-            path: result.path,
-            title: result.title,
-            source: result.usedFallback ? "fallback" : "agent",
-            bytes: 0,
-            telegramUserId: String(userId),
-          });
-          if (result.action !== "none") {
-            await db.insert(undoLog).values({
-              createdAt: new Date().toISOString(),
-              action: result.action,
-              path: result.path,
-              title: result.title,
-              block: result.block ?? null,
-              telegramUserId: String(userId),
-            });
-          }
+          await record(result, userId);
         } catch (error) {
           logger.error("could not process the message", { error: String(error) });
           await bot.api
             .sendMessage(chatId, "⚠️ Не смог записать заметку, попробуй ещё раз.")
+            .catch(() => undefined);
+        }
+      });
+    },
+    onAttachment: async ({ caption, file, userId, chatId }) => {
+      queue.push(async () => {
+        try {
+          const saved = await saveAttachment(
+            config.vault.path,
+            file.name,
+            file.data,
+            vault.currentDate(),
+          );
+          logger.info("saved a file of the owner", {
+            name: saved.name,
+            bytes: saved.bytes,
+          });
+
+          const text = caption.trim() || `Файл ${saved.name}`;
+          const result = await processMessage(
+            text,
+            userId,
+            { config, hermes, vault, logger: logger.child("pipeline") },
+            { attachment: saved },
+          );
+          await bot.api.sendMessage(chatId, result.status);
+          await record(result, userId);
+        } catch (error) {
+          logger.error("could not save the file", { error: String(error) });
+          await bot.api
+            .sendMessage(chatId, "⚠️ Не смог сохранить файл, попробуй ещё раз.")
             .catch(() => undefined);
         }
       });

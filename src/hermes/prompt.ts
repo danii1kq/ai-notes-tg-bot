@@ -6,6 +6,8 @@ export interface PromptContext {
   vaultPath: string;
   /** Titles of the notes that already exist (used for wiki links and targets). */
   noteTitles: string[];
+  /** The file that came with the message, if there was one. */
+  attachment?: { name: string; relativePath: string };
 }
 
 /**
@@ -38,6 +40,11 @@ export function buildPrompt(userText: string, ctx: PromptContext): string {
     titles.length > 0
       ? `- Уже существующие заметки: ${titles.map((title) => `"${title}"`).join(", ")}`
       : "- Хранилище пока пустое, первая заметка будет создана.",
+    ...(ctx.attachment
+      ? [
+          `- К сообщению приложен файл: ${ctx.attachment.relativePath}. Вставь его в заметку как ![[${ctx.attachment.name}]] и скажи, что это за файл.`,
+        ]
+      : []),
     "- Ответь одной короткой строкой о результате работы с заметкой.",
   ];
 
