@@ -5,16 +5,13 @@ on:
     types: [published]
   workflow_dispatch:
 
-env:
-  # The secrets are not available in the condition of a job, so the check of
-  # the token of npm lives in the environment of the workflow.
-  HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
-
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # The package is published only when the token of npm is in the secrets.
-    if: env.HAS_NPM_TOKEN == 'true'
+    # The secrets are not available in the condition of a job, they live in
+    # the environment of the job and the steps look at them.
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,15 +20,23 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - name: The token of npm
+        if: env.NPM_TOKEN == ''
+        run: |
+          echo "the package is not published, there is no token of npm"
+
       - name: The dependencies
+        if: env.NPM_TOKEN != ''
         run: |
           npm ci
           npm ci --prefix packages/vault-mcp
 
       - name: The build of the package
+        if: env.NPM_TOKEN != ''
         run: npm run build --prefix packages/vault-mcp
 
       - name: Publish
+        if: env.NPM_TOKEN != ''
         run: npm publish --prefix packages/vault-mcp --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

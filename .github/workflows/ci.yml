@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-env:
-  # The secrets are not available in the condition of a job, so the check of
-  # the deployment key lives in the environment of the workflow.
-  HAS_DEPLOY_KEY: ${{ secrets.VDS_SSH_KEY != '' }}
-
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -35,22 +30,33 @@ jobs:
 
   deploy:
     needs: check
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.HAS_DEPLOY_KEY == 'true'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    # The secrets are not available in the condition of a job, they live in
+    # the environment of the job and the steps look at them.
+    env:
+      VDS_SSH_KEY: ${{ secrets.VDS_SSH_KEY }}
+      VDS_KNOWN_HOSTS: ${{ secrets.VDS_KNOWN_HOSTS }}
+      VDS_HOST: ${{ secrets.VDS_HOST }}
+      VDS_PATH: ${{ secrets.VDS_PATH }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: The keys of the deployment
+        if: env.VDS_SSH_KEY == ''
+        run: |
+          echo "the deployment is skipped, there is no key of the server"
+
       - name: Set up the ssh key
+        if: env.VDS_SSH_KEY != ''
         run: |
           install -m 700 -d ~/.ssh
-          printf '%s\n' "${{ secrets.VDS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s\n' "$VDS_SSH_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          printf '%s\n' "${{ secrets.VDS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          printf '%s\n' "$VDS_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
       - name: Deploy to the server
-        env:
-          VDS_HOST: ${{ secrets.VDS_HOST }}
-          VDS_PATH: ${{ secrets.VDS_PATH }}
+        if: env.VDS_SSH_KEY != ''
         run: |
           ssh -i ~/.ssh/id_ed25519 "root@$VDS_HOST" "cd $VDS_PATH && bash deploy/deploy.sh"
