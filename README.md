@@ -92,13 +92,15 @@ guard:
 
 | Part | Technology |
 | --- | --- |
-| Bot | [grammY](https://grammy.dev), TypeScript, long polling |
+| Bot | [grammY](https://grammy.dev), TypeScript, long polling or a webhook |
 | Agent | Hermes Agent (installed in the image), one shot mode |
 | Vault tools | MCP server in Node, safe writes |
+| The vault MCP server as a package | [`@danii1kq/vault-mcp`](packages/vault-mcp), it works with any MCP client |
 | Web search | DuckDuckGo MCP server (`uvx duckduckgo-mcp-server`) |
 | Model | OpenCode Go relay through a local proxy |
 | Database | SQLite (libSQL + Drizzle ORM), audit log of the notes |
 | Sync | Syncthing (linuxserver image) |
+| The Mini App | React and Vite, served by the bot |
 | Tests | Vitest, Biome, husky + lint-staged, GitHub Actions |
 
 ### Installation on a server
@@ -123,10 +125,15 @@ Requirements: a Linux server with Docker and Docker Compose.
    | --- | --- |
    | `TELEGRAM_BOT_TOKEN` | token from [@BotFather](https://t.me/BotFather) |
    | `ALLOWED_TELEGRAM_ID` | your Telegram user id, only this id is served |
+   | `TELEGRAM_MODE` | `polling` by default, `webhook` when the bot has a public https address |
+   | `TELEGRAM_WEBHOOK_URL` | the public https address of the webhook, for the webhook mode |
+   | `TELEGRAM_WEBHOOK_SECRET` | the secret that Telegram sends with every webhook call |
    | `VAULT_HOST_PATH` | folder of the vault on the server, for example `/opt/obsidian-vault` |
    | `LLM_API_KEY` | key of the model provider |
    | `HERMES_MODEL` | model, `minimax-m3.1-flash-free` by default |
    | `HERMES_FALLBACK_MODEL` | model used when the first one fails |
+   | `MINI_APP_URL` | the public https address of the Mini App, for the menu button |
+   | `MINI_APP_TOKEN` | the token for the browser, the address of the app carries it |
    | `PUID` / `PGID` | owner of the notes, `1000` by default |
 
 3. Prepare the vault folder and build the containers:
@@ -147,6 +154,12 @@ Requirements: a Linux server with Docker and Docker Compose.
 The first build installs Hermes Agent and takes a while. Later builds reuse
 the cached layers.
 
+The image is in the registry as well, so a deployment can skip the build:
+
+```bash
+docker pull ghcr.io/danii1kq/telegram-to-obsidian_ai-agent:latest
+```
+
 ### The Mini App
 
 The notes are also a small web app inside Telegram. The button in the menu of
@@ -164,6 +177,29 @@ https://<your-host>/?token=<MINI_APP_TOKEN>
 
 The frontend lives in `web/`, it is built with Vite and served by the same
 process that runs the bot.
+
+Telegram accepts only https links for a Mini App, so the app is published
+through a Cloudflare tunnel. The script `deploy/tunnel.sh` starts the tunnel,
+watches its address and writes it into the environment file of the deployment:
+
+```bash
+bash deploy/tunnel.sh --install
+```
+
+The same tunnel can carry the webhook of the bot: set `TELEGRAM_MODE=webhook`
+and `TELEGRAM_WEBHOOK_URL=https://<the address of the tunnel>/webhook`.
+
+### The vault MCP server as a package
+
+The tools of the vault work with any MCP client, not only with the bot. They
+are published as a separate package:
+
+```bash
+npm install -g @danii1kq/vault-mcp
+OBSIDIAN_VAULT_PATH=/path/to/vault vault-mcp
+```
+
+The description of the package is in [packages/vault-mcp](packages/vault-mcp).
 
 ### Syncthing and your laptop
 
@@ -301,13 +337,15 @@ tags: [journal, daily]
 
 | Часть | Технология |
 | --- | --- |
-| Бот | [grammY](https://grammy.dev), TypeScript, long polling |
+| Бот | [grammY](https://grammy.dev), TypeScript, long polling или webhook |
 | Агент | Hermes Agent (ставится в образ), одноразовый запуск |
 | Инструменты хранилища | MCP-сервер на Node, безопасная запись |
+| MCP-сервер хранилища отдельным пакетом | [`@danii1kq/vault-mcp`](packages/vault-mcp), работает с любым MCP-клиентом |
 | Поиск в интернете | DuckDuckGo MCP-сервер (`uvx duckduckgo-mcp-server`) |
 | Модель | OpenCode Go через локальный прокси |
 | База | SQLite (libSQL + Drizzle ORM), журнал заметок |
 | Синхронизация | Syncthing (образ linuxserver) |
+| Мини-приложение | React и Vite, раздаётся ботом |
 | Тесты | Vitest, Biome, husky + lint-staged, GitHub Actions |
 
 ### Установка на сервер
@@ -332,10 +370,15 @@ tags: [journal, daily]
    | --- | --- |
    | `TELEGRAM_BOT_TOKEN` | токен от [@BotFather](https://t.me/BotFather) |
    | `ALLOWED_TELEGRAM_ID` | твой Telegram id, только он обслуживается |
+   | `TELEGRAM_MODE` | по умолчанию `polling`, `webhook`, когда у бота есть публичный https-адрес |
+   | `TELEGRAM_WEBHOOK_URL` | публичный https-адрес webhook, для режима webhook |
+   | `TELEGRAM_WEBHOOK_SECRET` | секрет, который Telegram шлёт с каждым вызовом webhook |
    | `VAULT_HOST_PATH` | папка хранилища на сервере, например `/opt/obsidian-vault` |
    | `LLM_API_KEY` | ключ модельного провайдера |
    | `HERMES_MODEL` | модель, по умолчанию `minimax-m3.1-flash-free` |
    | `HERMES_FALLBACK_MODEL` | резервная модель, если основная не ответила |
+   | `MINI_APP_URL` | публичный https-адрес мини-приложения, для кнопки в меню |
+   | `MINI_APP_TOKEN` | токен для браузера, он едет в адресе приложения |
    | `PUID` / `PGID` | владелец файлов заметок, по умолчанию `1000` |
 
 3. Готовим папку хранилища и собираем контейнеры:
@@ -355,6 +398,12 @@ tags: [journal, daily]
 
 Первая сборка ставит Hermes Agent и идёт долго, дальше используются кэшированные слои.
 
+Образ есть и в реестре, так что при деплое можно не собирать его заново:
+
+```bash
+docker pull ghcr.io/danii1kq/telegram-to-obsidian_ai-agent:latest
+```
+
 ### Мини-приложение
 
 Заметки доступны ещё и как маленькое веб-приложение внутри Telegram. Кнопка
@@ -372,6 +421,30 @@ https://<your-host>/?token=<MINI_APP_TOKEN>
 
 Фронтенд лежит в `web/`, он собирается через Vite и раздаётся тем же
 процессом, который работает ботом.
+
+Telegram принимает для мини-приложения только https-ссылки, поэтому
+приложение публикуется через туннель Cloudflare. Скрипт `deploy/tunnel.sh`
+поднимает туннель, следит за его адресом и записывает его в файл окружения
+деплоя:
+
+```bash
+bash deploy/tunnel.sh --install
+```
+
+Через тот же туннель можно провести и webhook бота: поставь
+`TELEGRAM_MODE=webhook` и `TELEGRAM_WEBHOOK_URL=https://<адрес туннеля>/webhook`.
+
+### MCP-сервер хранилища отдельным пакетом
+
+Инструменты хранилища работают с любым MCP-клиентом, не только с ботом. Они
+опубликованы отдельным пакетом:
+
+```bash
+npm install -g @danii1kq/vault-mcp
+OBSIDIAN_VAULT_PATH=/path/to/vault vault-mcp
+```
+
+Описание пакета лежит в [packages/vault-mcp](packages/vault-mcp).
 
 ### Syncthing и ноутбук
 
