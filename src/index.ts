@@ -6,6 +6,9 @@ import { listInbox, searchNotes, undoLast } from "./bot/actions.js";
 import { createBot } from "./bot/bot.js";
 import { MessageQueue } from "./bot/queue.js";
 import { loadConfig } from "./config.js";
+import { catchUpDailySummaries, runDailySummary } from "./daily/summary.js";
+import { startDailyScheduler } from "./daily/scheduler.js";
+import { localDate, previousDay } from "./daily/time.js";
 import { createDatabase } from "./db/index.js";
 import { notesLog, undoLog } from "./db/schema.js";
 import { HermesClient } from "./hermes/client.js";
@@ -76,6 +79,17 @@ async function main(): Promise<void> {
   });
 
   const queue = new MessageQueue(logger.child("queue"));
+
+  const dailyDeps = {
+    config,
+    db,
+    vault,
+    hermes,
+    logger: logger.child("daily"),
+  };
+
+  /** The chat of the owner, the bot writes there. */
+  const ownerChatId = [...config.telegram.allowedUserIds][0] ?? 0;
 
   /** Writes the result of the pipeline into the log of the notes and of the undo. */
   const record = async (result: ProcessResult, userId: number): Promise<void> => {
@@ -167,6 +181,45 @@ async function main(): Promise<void> {
     onUndo: async (userId, confirmed) =>
       undoLast({ vault, db, logger: logger.child("actions") }, userId, confirmed),
     onInbox: async () => listInbox({ vault, db, logger: logger.child("actions") }),
+    onSummary: async (day, userId) => {
+      const requested = /^\d{4}-\d{2}-\d{2}$/.test(day)
+        ? day
+        : previousDay(localDate(new Date(), config.vault.timeZone));
+      const chatId = userId;
+
+      void queue.push(async () => {
+        const summary = await runDailySummary(dailyDeps, requested);
+        if (!summary) {
+          await bot.api
+            .sendMessage(chatId, `📅 За ${requested} заметок не было, итог не записываю.`)
+            .catch(() => undefined);
+          return;
+        }
+        await bot.api
+          .sendMessage(chatId, `📅 Итог за ${summary.day}:\n\n${summary.summary}`)
+          .catch(() => undefined);
+      });
+
+      return `📅 Считаю итог за ${requested}...`;
+    },
+  });
+
+  const scheduler = startDailyScheduler({
+    timeZone: config.vault.timeZone,
+    logger: logger.child("daily"),
+    run: async (day) => {
+      await queue.push(async () => {
+        const summary = await runDailySummary(dailyDeps, day);
+        if (!summary) return;
+        await bot.api
+          .sendMessage(ownerChatId, `📅 Итог за ${summary.day}:\n\n${summary.summary}`)
+          .catch(() => undefined);
+      });
+    },
+  });
+  logger.info("the daily summary is scheduled", {
+    next: scheduler.nextRunAt().toISOString(),
+    timeZone: config.vault.timeZone,
   });
 
   const healthServer = createServer((request, response) => {
@@ -190,6 +243,7 @@ async function main(): Promise<void> {
 
   const stop = async (signal: string) => {
     logger.info("stopping", { signal });
+    scheduler.stop();
     watcher.stop();
     await proxy.stop();
     healthServer.close();
@@ -202,6 +256,20 @@ async function main(): Promise<void> {
   await bot.start({
     onStart: (info) => logger.info("the bot is polling Telegram", { username: info.username }),
     drop_pending_updates: true,
+  });
+
+  // The summary of the days that were missed while the bot was down.
+  void queue.push(async () => {
+    try {
+      const summaries = await catchUpDailySummaries(dailyDeps);
+      for (const summary of summaries) {
+        await bot.api
+          .sendMessage(ownerChatId, `📅 Итог за ${summary.day}:\n\n${summary.summary}`)
+          .catch(() => undefined);
+      }
+    } catch (error) {
+      logger.error("could not catch up the daily summaries", { error: String(error) });
+    }
   });
 }
 

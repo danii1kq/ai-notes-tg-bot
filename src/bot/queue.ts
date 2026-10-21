@@ -12,9 +12,20 @@ export class MessageQueue {
 
   constructor(private readonly logger: Logger) {}
 
-  push(job: () => Promise<void>): void {
-    this.pending.push(job);
-    void this.drain();
+  /** Adds a job to the queue and waits until it is done. */
+  push(job: () => Promise<void>): Promise<void> {
+    return new Promise<void>((resolve) => {
+      this.pending.push(async () => {
+        try {
+          await job();
+        } catch (error) {
+          this.logger.error("a queued job failed", { error: String(error) });
+        } finally {
+          resolve();
+        }
+      });
+      void this.drain();
+    });
   }
 
   get size(): number {

@@ -52,6 +52,15 @@ export async function ensureSchema(client: Client): Promise<void> {
       telegram_user_id TEXT
     )`,
   );
+  await client.execute(
+    `CREATE TABLE IF NOT EXISTS daily_summaries (
+      date TEXT PRIMARY KEY,
+      file TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      notes_count INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    )`,
+  );
   await client.execute("CREATE INDEX IF NOT EXISTS notes_log_created_at ON notes_log (created_at)");
   await client.execute("CREATE INDEX IF NOT EXISTS undo_log_created_at ON undo_log (created_at)");
 }

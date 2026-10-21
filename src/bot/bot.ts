@@ -16,6 +16,8 @@ export interface BotDeps {
   onUndo: (userId: number, confirmed: boolean) => Promise<string>;
   /** Lists the notes of the inbox, shown for /inbox. */
   onInbox: (userId: number) => Promise<string>;
+  /** Makes the summary of a day, shown for /summary. */
+  onSummary: (day: string, userId: number) => Promise<string>;
   /** Saves a file of the owner and writes a note about it. */
   onAttachment: (input: {
     caption: string;
@@ -94,6 +96,12 @@ export function createBot(deps: BotDeps): Bot {
   bot.command("undo", async (ctx) => {
     const confirmed = (ctx.match ?? "").trim().toLowerCase() === "confirm";
     const result = await deps.onUndo(ctx.from?.id ?? 0, confirmed);
+    await ctx.reply(result);
+  });
+
+  bot.command("summary", async (ctx) => {
+    const day = (ctx.match ?? "").trim();
+    const result = await deps.onSummary(day, ctx.from?.id ?? 0);
     await ctx.reply(result);
   });
 

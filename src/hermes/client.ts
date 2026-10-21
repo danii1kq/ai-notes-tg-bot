@@ -12,6 +12,14 @@ export interface HermesRunResult {
   stderr: string;
 }
 
+export interface HermesRunOptions {
+  /**
+   * The toolsets of the agent, separated by commas. `safe` leaves the file and
+   * the terminal tools away, so the agent can only answer with a text.
+   */
+  toolsets?: string;
+}
+
 export interface HermesClientOptions {
   bin: string;
   model: string;
@@ -34,8 +42,8 @@ export interface HermesClientOptions {
 export class HermesClient {
   constructor(private readonly options: HermesClientOptions) {}
 
-  async run(prompt: string): Promise<HermesRunResult> {
-    const primary = await this.spawnOnce(prompt, this.options.model);
+  async run(prompt: string, options: HermesRunOptions = {}): Promise<HermesRunResult> {
+    const primary = await this.spawnOnce(prompt, this.options.model, options);
     if (primary.ok) {
       return { ...primary, model: this.options.model, usedFallback: false };
     }
@@ -49,13 +57,14 @@ export class HermesClient {
       model: this.options.model,
       error: primary.error,
     });
-    const fallback = await this.spawnOnce(prompt, fallbackModel);
+    const fallback = await this.spawnOnce(prompt, fallbackModel, options);
     return { ...fallback, model: fallbackModel, usedFallback: true };
   }
 
   private spawnOnce(
     prompt: string,
     model: string,
+    options: HermesRunOptions = {},
   ): Promise<Omit<HermesRunResult, "model" | "usedFallback">> {
     const startedAt = Date.now();
     // `hermes chat -q` runs one query in the working directory (the agent
@@ -73,6 +82,10 @@ export class HermesClient {
       "-m",
       model,
     ];
+
+    if (options.toolsets) {
+      args.push("--toolsets", options.toolsets);
+    }
 
     return new Promise((resolve) => {
       let stdout = "";

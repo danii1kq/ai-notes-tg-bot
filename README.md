@@ -43,9 +43,34 @@ user id is dropped without an answer.
 | `/inbox` | lists the notes that still carry the `inbox` tag |
 | `/undo` | undoes the last write of the bot: an appended block is removed, an overwritten note gets its old content back, a created note is deleted |
 | `/undo confirm` | deletes a created note that was changed after the bot wrote it |
+| `/summary` | makes the summary of yesterday right now |
+| `/summary 2026-10-20` | makes the summary of that day |
 
 Tags are written in the message itself: `#idea #work` end up in the
 `tags` field of the frontmatter of the note, next to `inbox` and `telegram`.
+
+### The daily summary
+
+At midnight, in the time zone of the owner, the agent looks at the notes of
+the day that is over and writes a short summary of it into the file of the
+month, `october_2026.md` for example:
+
+```markdown
+---
+date: 2026-10-01
+tags: [journal, daily]
+---
+
+# Октябрь 2026
+
+## 2026-10-21
+
+Дописал заметку о проекте, придумал идею для нового продукта.
+```
+
+Every day is a section of its own. A day without a note is simply missing in
+the file, and the summary also comes to the chat of the owner. When the bot
+was down at midnight, the missing summaries are made after the restart.
 
 ### How the notes stay safe
 
@@ -213,9 +238,33 @@ node dist/selftest.js "an idea for a business"
 | `/inbox` | показывает заметки с тегом `inbox` |
 | `/undo` | отменяет последнюю запись бота: дописанный блок убирается, перезаписанная заметка получает прежнее содержимое, созданная заметка удаляется |
 | `/undo confirm` | удаляет созданную заметку, которую меняли после записи бота |
+| `/summary` | делает итог за вчера прямо сейчас |
+| `/summary 2026-10-20` | делает итог за этот день |
 
 Теги пишутся прямо в сообщении: `#идея #работа` попадают в поле `tags`
 фронтматтера заметки рядом с `inbox` и `telegram`.
+
+### Итог дня
+
+В полночь, по времени владельца, агент смотрит на заметки прошедшего дня и
+записывает короткий вывод в файл месяца, например `october_2026.md`:
+
+```markdown
+---
+date: 2026-10-01
+tags: [journal, daily]
+---
+
+# Октябрь 2026
+
+## 2026-10-21
+
+Дописал заметку о проекте, придумал идею для нового продукта.
+```
+
+Каждый день - отдельный раздел. Дня без заметок в файле просто нет, и вывод
+приходит ещё и в чат. Если бот был выключен в полночь, недостающие итоги
+досчитываются после запуска.
 
 ### Почему заметки не теряются
 

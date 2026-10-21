@@ -38,4 +38,16 @@ export const undoLog = sqliteTable("undo_log", {
   telegramUserId: text("telegram_user_id"),
 });
 
-export const schema = { notesLog, processedUpdates, undoLog };
+/**
+ * The summary of every day, so the file of the month can be written again and
+ * a day is never summarised twice.
+ */
+export const dailySummaries = sqliteTable("daily_summaries", {
+  date: text("date").primaryKey(),
+  file: text("file").notNull(),
+  summary: text("summary").notNull(),
+  notesCount: integer("notes_count").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const schema = { notesLog, processedUpdates, undoLog, dailySummaries };
