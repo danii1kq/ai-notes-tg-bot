@@ -60,8 +60,8 @@ Tags are written in the message itself: `#idea #work` end up in the
 ### The daily summary
 
 At midnight, in the time zone of the owner, the agent looks at the notes of
-the day that is over and writes a short summary of it into the file of the
-month, `october_2026.md` for example:
+the day that is over and writes a summary of it into the file of the month,
+`october_2026.md` for example:
 
 ```markdown
 ---
@@ -73,12 +73,17 @@ tags: [journal, daily]
 
 ## 2026-10-21
 
-Дописал заметку о проекте, придумал идею для нового продукта.
+Заметка «Идеи для бизнеса»: мысль о кофе на районе.
+Заметка «Дневник»: запись о прогулке и о книге.
 ```
 
-Every day is a section of its own. A day without a note is simply missing in
-the file, and the summary also comes to the chat of the owner. When the bot
-was down at midnight, the missing summaries are made after the restart.
+The summary tells what was written that day, note by note. Every day is a
+section of its own, a day without a note is simply missing in the file.
+
+The chat only gets a short notice with a button to the Mini App, the whole
+summary lives in the file of the month and in the Mini App, where it is shown
+at the top of the list of the notes. When the bot was down at midnight, the
+missing summaries are made after the restart.
 
 ### How the notes stay safe
 
@@ -349,7 +354,7 @@ node dist/selftest.js "an idea for a business"
 ### Итог дня
 
 В полночь, по времени владельца, агент смотрит на заметки прошедшего дня и
-записывает короткий вывод в файл месяца, например `october_2026.md`:
+записывает вывод в файл месяца, например `october_2026.md`:
 
 ```markdown
 ---
@@ -361,11 +366,16 @@ tags: [journal, daily]
 
 ## 2026-10-21
 
-Дописал заметку о проекте, придумал идею для нового продукта.
+Заметка «Идеи для бизнеса»: мысль о кофе на районе.
+Заметка «Дневник»: запись о прогулке и о книге.
 ```
 
-Каждый день - отдельный раздел. Дня без заметок в файле просто нет, и вывод
-приходит ещё и в чат. Если бот был выключен в полночь, недостающие итоги
+Итог пишет, что именно было записано за день, по заметкам. Каждый день -
+отдельный раздел, дня без заметок в файле просто нет.
+
+В чат приходит только короткое уведомление с кнопкой на мини-приложение, а
+сам итог лежит в файле месяца и в мини-приложении, где он показан сверху
+списка заметок. Если бот был выключен в полночь, недостающие итоги
 досчитываются после запуска.
 
 ### Почему заметки не теряются

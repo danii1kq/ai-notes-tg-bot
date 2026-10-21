@@ -5,6 +5,15 @@ import type { Logger } from "../logger.js";
 import type { VaultOperations } from "../vault/operations.js";
 import { validateInitData } from "./auth.js";
 
+export interface SummaryEntry {
+  /** The day of the summary, `2026-10-21`. */
+  date: string;
+  /** The text of the summary. */
+  summary: string;
+  /** The file of the month with the summary. */
+  file: string;
+}
+
 export interface MiniAppOptions {
   vault: VaultOperations;
   botToken: string;
@@ -13,6 +22,8 @@ export interface MiniAppOptions {
   logger: Logger;
   /** The folder with the built frontend. */
   webRoot: string;
+  /** The summaries of the days, they are shown at the top of the list. */
+  summaries?: () => Promise<SummaryEntry[]>;
 }
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -73,6 +84,12 @@ export function createMiniApp(options: MiniAppOptions) {
     }
 
     try {
+      if (pathname === "/api/summaries") {
+        const entries = options.summaries ? await options.summaries() : [];
+        sendJson(response, 200, { ok: true, summaries: entries });
+        return;
+      }
+
       if (pathname === "/api/notes") {
         const limit = clamp(Number(url.searchParams.get("limit") ?? 60), 1, 200);
         const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0);

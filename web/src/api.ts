@@ -21,6 +21,12 @@ export interface NoteFile {
   bytes: number;
 }
 
+export interface SummaryEntry {
+  date: string;
+  summary: string;
+  file: string;
+}
+
 /** The token of the owner, when the app is opened in a browser. */
 export const fileToken = new URLSearchParams(window.location.search).get("token") ?? "";
 
@@ -60,4 +66,10 @@ export async function searchNotes(query: string): Promise<SearchHit[]> {
     `/api/search?q=${encodeURIComponent(query)}`,
   );
   return payload.hits;
+}
+
+/** The summaries of the days, the newest first. */
+export async function fetchSummaries(): Promise<SummaryEntry[]> {
+  const payload = await request<{ summaries: SummaryEntry[] }>("/api/summaries");
+  return payload.summaries;
 }

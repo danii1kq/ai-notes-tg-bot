@@ -7,6 +7,7 @@ import {
   cleanSummary,
   revertStrayWrites,
   runDailySummary,
+  summaryNotice,
   writeSection,
 } from "../src/daily/summary.js";
 import {
@@ -135,6 +136,20 @@ describe("writeSection", () => {
 
     const content = await readFile(path.join(vaultPath, "october_2026.md"), "utf8");
     expect(content.indexOf("## 2026-10-21")).toBeLessThan(content.indexOf("## 2026-10-22"));
+  });
+});
+
+describe("summaryNotice", () => {
+  it("says that the summary is ready", () => {
+    const notice = summaryNotice("2026-10-21");
+    expect(notice.text).toContain("2026-10-21");
+    expect(notice.text).toContain("мини-приложении");
+    expect(notice.miniAppUrl).toBeUndefined();
+  });
+
+  it("carries the address of the mini app", () => {
+    const notice = summaryNotice("2026-10-21", "https://notes.example.com");
+    expect(notice.miniAppUrl).toBe("https://notes.example.com");
   });
 });
 

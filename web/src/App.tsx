@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchNote,
   fetchNotes,
+  fetchSummaries,
   fileToken,
   type NoteSummary,
   type SearchHit,
+  type SummaryEntry,
   searchNotes,
 } from "./api";
 import { renderMarkdown } from "./markdown";
@@ -27,6 +29,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [notes, setNotes] = useState<NoteSummary[]>([]);
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const [summaries, setSummaries] = useState<SummaryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +51,9 @@ export default function App() {
     telegram?.ready();
     telegram?.expand();
     void loadNotes();
+    fetchSummaries()
+      .then((list) => setSummaries(list))
+      .catch(() => setSummaries([]));
   }, [loadNotes]);
 
   // The search waits for a pause in the typing.
@@ -124,7 +130,13 @@ export default function App() {
               <div className="state-hint">Напиши боту в Telegram, и заметка появится здесь.</div>
             </div>
           ) : (
-            <NoteList notes={notes} onOpen={(note) => openNote(note.path, note.title, setView)} />
+            <>
+              <SummaryCard
+                summaries={summaries}
+                onOpen={(path, title) => openNote(path, title, setView)}
+              />
+              <NoteList notes={notes} onOpen={(note) => openNote(note.path, note.title, setView)} />
+            </>
           )}
         </>
       ) : (
@@ -137,6 +149,32 @@ export default function App() {
 function openNote(path: string, title: string, setView: (view: View) => void): void {
   haptic();
   setView({ name: "note", path, title });
+}
+
+function SummaryCard({
+  summaries,
+  onOpen,
+}: {
+  summaries: SummaryEntry[];
+  onOpen: (path: string, title: string) => void;
+}) {
+  const latest = summaries[0];
+  if (!latest) return null;
+
+  return (
+    <button
+      className="card card-summary"
+      type="button"
+      onClick={() => onOpen(latest.file, "Итоги дня")}
+    >
+      <h2 className="card-title">Итоги дня</h2>
+      <div className="card-meta">
+        <span>{formatDate(latest.date)}</span>
+        {summaries.length > 1 ? <span>дней: {summaries.length}</span> : null}
+      </div>
+      <p className="card-snippet">{latest.summary}</p>
+    </button>
+  );
 }
 
 function NoteList({

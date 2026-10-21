@@ -176,6 +176,16 @@ body {
   overflow: hidden;
 }
 
+/* The card of the summaries of the days, it stands out a little. */
+.card-summary {
+  border-color: color-mix(in srgb, var(--link) 22%, var(--separator));
+  background: color-mix(in srgb, var(--link) 6%, var(--section-bg));
+}
+
+.card-summary .card-title {
+  color: var(--accent-text);
+}
+
 .chip {
   padding: 2px var(--space-2);
   border-radius: var(--radius-chip);

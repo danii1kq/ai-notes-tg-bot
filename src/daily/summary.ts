@@ -201,6 +201,26 @@ export async function collectNotesOfDay(deps: DailyDeps, day: string): Promise<D
   return notes;
 }
 
+/** The notice of the chat: the summary is ready, it is in the Mini App. */
+export interface SummaryNotice {
+  text: string;
+  /** The address of the Mini App, when it is known. */
+  miniAppUrl?: string;
+}
+
+/**
+ * The short message of the chat.
+ *
+ * The whole summary is in the file of the month and in the Mini App, the chat
+ * only says that it is ready.
+ */
+export function summaryNotice(day: string, miniAppUrl?: string): SummaryNotice {
+  return {
+    text: `📅 Итоги за ${day} готовы. Их можно посмотреть в мини-приложении.`,
+    ...(miniAppUrl ? { miniAppUrl } : {}),
+  };
+}
+
 /** The next day of a day, `2026-10-21` -> `2026-10-22`. */
 function nextDay(day: string): string {
   const [year, month, date] = day.split("-").map(Number);
@@ -232,10 +252,12 @@ export function buildSummaryPrompt(day: string, notes: DayNote[]): string {
     "",
     list,
     "",
-    "Напиши короткий вывод (2-6 предложений) о том, что было сделано за этот день:",
-    "над чем шла работа, какие решения приняты, какие идеи появились.",
-    "Пиши по-русски, обычным текстом: без заголовков, без списков, без длинных тире.",
-    "Ничего не записывай в хранилище, ответь только текстом вывода.",
+    "Напиши итог за этот день по этим заметкам:",
+    "перечисли заметки дня и о каждой скажи в одной-двух фразах, что именно в ней записано.",
+    "Пиши по-русски, простым текстом, каждый день с новой строки.",
+    "Только то, что есть в заметках, ничего не выдумывай и не добавляй ничего от себя.",
+    "Без заголовков, без длинных тире.",
+    "Ничего не записывай в хранилище, ответь только текстом итога.",
   ].join("\n");
 }
 

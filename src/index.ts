@@ -1,16 +1,22 @@
-import { mkdir } from "node:fs/promises";
+﻿import { mkdir } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
-import type { Bot } from "grammy";
+import { desc } from "drizzle-orm";
+import { type Bot, InlineKeyboard } from "grammy";
 import { buildStatus, listInbox, searchNotes, undoLast } from "./bot/actions.js";
 import { createBot } from "./bot/bot.js";
 import { MessageQueue } from "./bot/queue.js";
 import { loadConfig } from "./config.js";
 import { startDailyScheduler } from "./daily/scheduler.js";
-import { catchUpDailySummaries, runDailySummary } from "./daily/summary.js";
+import {
+  catchUpDailySummaries,
+  runDailySummary,
+  type SummaryNotice,
+  summaryNotice,
+} from "./daily/summary.js";
 import { localDate, previousDay } from "./daily/time.js";
 import { createDatabase } from "./db/index.js";
-import { notesLog, undoLog } from "./db/schema.js";
+import { dailySummaries, notesLog, undoLog } from "./db/schema.js";
 import { HermesClient } from "./hermes/client.js";
 import { createLlmProxy } from "./llm/proxy.js";
 import { createLogger, type Logger } from "./logger.js";
@@ -202,8 +208,9 @@ async function main(): Promise<void> {
             .catch(() => undefined);
           return;
         }
+        const notice = summaryNotice(summary.day, config.miniApp.url);
         await bot.api
-          .sendMessage(chatId, `📅 Итог за ${summary.day}:\n\n${summary.summary}`)
+          .sendMessage(chatId, notice.text, summaryMarkup(notice))
           .catch(() => undefined);
       });
 
@@ -218,8 +225,9 @@ async function main(): Promise<void> {
       await queue.push(async () => {
         const summary = await runDailySummary(dailyDeps, day);
         if (!summary) return;
+        const notice = summaryNotice(summary.day, config.miniApp.url);
         await bot.api
-          .sendMessage(ownerChatId, `📅 Итог за ${summary.day}:\n\n${summary.summary}`)
+          .sendMessage(ownerChatId, notice.text, summaryMarkup(notice))
           .catch(() => undefined);
       });
     },
@@ -235,6 +243,14 @@ async function main(): Promise<void> {
     browserToken: config.miniApp.token,
     logger: logger.child("miniapp"),
     webRoot: config.miniApp.webRoot,
+    summaries: async () => {
+      const rows = await db
+        .select()
+        .from(dailySummaries)
+        .orderBy(desc(dailySummaries.date))
+        .limit(30);
+      return rows.map((row) => ({ date: row.date, summary: row.summary, file: row.file }));
+    },
   });
 
   const healthServer = createServer((request, response) => {
@@ -316,8 +332,9 @@ async function main(): Promise<void> {
     try {
       const summaries = await catchUpDailySummaries(dailyDeps);
       for (const summary of summaries) {
+        const notice = summaryNotice(summary.day, config.miniApp.url);
         await bot.api
-          .sendMessage(ownerChatId, `📅 Итог за ${summary.day}:\n\n${summary.summary}`)
+          .sendMessage(ownerChatId, notice.text, summaryMarkup(notice))
           .catch(() => undefined);
       }
     } catch (error) {
@@ -337,6 +354,17 @@ async function main(): Promise<void> {
   } else {
     await startPolling(bot, logger);
   }
+}
+
+/**
+ * The markup of the notice of the daily summary: the button opens the Mini
+ * App with the notes.
+ */
+function summaryMarkup(notice: SummaryNotice): { reply_markup: InlineKeyboard } | undefined {
+  if (!notice.miniAppUrl) return undefined;
+  return {
+    reply_markup: new InlineKeyboard().webApp("Открыть заметки", notice.miniAppUrl),
+  };
 }
 
 /**
