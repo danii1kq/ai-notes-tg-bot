@@ -301,22 +301,6 @@ async function main(): Promise<void> {
   process.on("SIGINT", () => void stop("SIGINT"));
   process.on("SIGTERM", () => void stop("SIGTERM"));
 
-  if (config.telegram.mode === "webhook" && config.telegram.webhookUrl) {
-    await bot.init();
-    await bot.api.setWebhook(config.telegram.webhookUrl, {
-      secret_token: config.telegram.webhookSecret || undefined,
-      allowed_updates: ["message"],
-    });
-    logger.info("the bot waits for the updates on the webhook", {
-      url: config.telegram.webhookUrl,
-    });
-  } else {
-    await bot.start({
-      onStart: (info) => logger.info("the bot is polling Telegram", { username: info.username }),
-      drop_pending_updates: true,
-    });
-  }
-
   // The button of the chat menu opens the Mini App with the notes.
   if (config.miniApp.url) {
     try {
@@ -340,6 +324,22 @@ async function main(): Promise<void> {
       logger.error("could not catch up the daily summaries", { error: String(error) });
     }
   });
+
+  if (config.telegram.mode === "webhook" && config.telegram.webhookUrl) {
+    await bot.init();
+    await bot.api.setWebhook(config.telegram.webhookUrl, {
+      secret_token: config.telegram.webhookSecret || undefined,
+      allowed_updates: ["message"],
+    });
+    logger.info("the bot waits for the updates on the webhook", {
+      url: config.telegram.webhookUrl,
+    });
+  } else {
+    await bot.start({
+      onStart: (info) => logger.info("the bot is polling Telegram", { username: info.username }),
+      drop_pending_updates: true,
+    });
+  }
 }
 
 main().catch((error) => {
