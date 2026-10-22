@@ -10,20 +10,22 @@
 
   /* --- The tokens of the theme -------------------------------------------
    * The values of Telegram are the source of truth. The second value of
-   * every var() is the fallback for the browser.
+   * every var() is the fallback for the browser. The muted and the faint
+   * text are made from the base colour, so they follow the theme.
    */
+  --text-base: var(--tg-theme-text-color, #101014);
   --surface: var(--tg-theme-bg-color, #ffffff);
   --surface-raised: var(--tg-theme-section-bg-color, #ffffff);
   --surface-sunken: var(--tg-theme-secondary-bg-color, #f1f1f4);
-  --text: var(--tg-theme-text-color, #101014);
-  --text-muted: color-mix(in srgb, var(--tg-theme-text-color, #101014) 64%, transparent);
-  --text-faint: color-mix(in srgb, var(--tg-theme-text-color, #101014) 46%, transparent);
+  --text: var(--text-base);
+  --text-muted: color-mix(in srgb, var(--text-base) 66%, transparent);
+  --text-faint: color-mix(in srgb, var(--text-base) 48%, transparent);
   --accent: var(--tg-theme-link-color, #2f7cf6);
   --accent-text: var(--tg-theme-accent-text-color, var(--tg-theme-link-color, #2f7cf6));
   --danger: var(--tg-theme-destructive-text-color, #e5484d);
   --border: var(--tg-theme-section-separator-color, rgba(17, 17, 17, 0.14));
-  --fill: color-mix(in srgb, var(--tg-theme-text-color, #101014) 7%, transparent);
-  --fill-strong: color-mix(in srgb, var(--tg-theme-text-color, #101014) 12%, transparent);
+  --fill: color-mix(in srgb, var(--text-base) 8%, transparent);
+  --fill-strong: color-mix(in srgb, var(--text-base) 14%, transparent);
   --accent-fill: color-mix(in srgb, var(--tg-theme-link-color, #2f7cf6) 12%, transparent);
   --accent-border: color-mix(in srgb, var(--tg-theme-link-color, #2f7cf6) 34%, transparent);
   --danger-fill: color-mix(
@@ -48,10 +50,10 @@
 /* Outside of Telegram the app follows the system theme. */
 @media (prefers-color-scheme: dark) {
   :root {
+    --text-base: var(--tg-theme-text-color, #f2f2f7);
     --surface: var(--tg-theme-bg-color, #0d0d10);
     --surface-raised: var(--tg-theme-section-bg-color, #1a1a1f);
     --surface-sunken: var(--tg-theme-secondary-bg-color, #24242a);
-    --text: var(--tg-theme-text-color, #f2f2f7);
     --border: var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.14));
   }
 }
