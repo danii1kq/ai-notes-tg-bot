@@ -39,9 +39,10 @@ chmod 600 "$HERMES_HOME/.env"
 # --- The agent and the bot ---------------------------------------------------
 # The agent gets no token of Telegram. When the token is in the environment,
 # the agent starts a gateway of its own and polls Telegram with it, and the
-# bot gets a conflict from Telegram. The application needs the token, so it is
-# put back before the start.
+# bot gets a conflict from Telegram. The application needs both values, so
+# they are put back before the start.
 BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+OWNER_ID="${ALLOWED_TELEGRAM_ID:-}"
 unset TELEGRAM_BOT_TOKEN
 unset ALLOWED_TELEGRAM_ID
 
@@ -88,4 +89,5 @@ hermes mcp list 2>&1 | sed 's/^/[entrypoint] /' || log "warning: could not list 
 # --- Start ------------------------------------------------------------------
 log "starting: $*"
 export TELEGRAM_BOT_TOKEN="$BOT_TOKEN"
+export ALLOWED_TELEGRAM_ID="$OWNER_ID"
 exec "$@"
