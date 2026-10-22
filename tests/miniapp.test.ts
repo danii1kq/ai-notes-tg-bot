@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -100,6 +100,41 @@ describe("validateInitData", () => {
 
   it("does not take the empty data", () => {
     expect(validateInitData("", BOT_TOKEN).ok).toBe(false);
+  });
+});
+
+describe("the static files of the mini app", () => {
+  it("gives the page and the assets of the build", async () => {
+    const { handle, root } = await makeMiniApp();
+    const webRoot = path.join(root, "web");
+    await mkdir(path.join(webRoot, "assets"), { recursive: true });
+    await writeFile(
+      path.join(webRoot, "index.html"),
+      '<script src="./assets/index-abc.js"></script>',
+      "utf8",
+    );
+    await writeFile(path.join(webRoot, "assets", "index-abc.js"), "console.log(1)", "utf8");
+
+    const page = fakeResponse();
+    await handle(fakeRequest("/"), page);
+    expect(page.statusCode).toBe(200);
+    expect(page.body()).toContain("assets/index-abc.js");
+
+    // The paths of the assets are relative, so they are asked for from the root.
+    const asset = fakeResponse();
+    await handle(fakeRequest("/assets/index-abc.js"), asset);
+    expect(asset.statusCode).toBe(200);
+    expect(asset.body()).toBe("console.log(1)");
+  });
+
+  it("does not go out of the folder of the frontend", async () => {
+    const { handle } = await makeMiniApp();
+    const response = fakeResponse();
+    await handle(fakeRequest("/../../etc/passwd"), response);
+    // The path is normalized and the file is not in the folder of the
+    // frontend, so it is never given away.
+    expect(response.statusCode).not.toBe(200);
+    expect(response.body()).not.toContain("root:");
   });
 });
 

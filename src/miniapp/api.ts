@@ -63,12 +63,11 @@ export function createMiniApp(options: MiniAppOptions) {
       return true;
     }
 
-    if (pathname === "/" || pathname === "/app" || pathname.startsWith("/app/")) {
-      await serveStatic(response, pathname);
-      return true;
-    }
-
-    return false;
+    // Everything else belongs to the frontend: the page itself and the assets
+    // of the build. The paths of the assets are relative, so they are asked
+    // for from the root of the app.
+    await serveStatic(response, pathname);
+    return true;
   };
 
   async function handleApi(
@@ -179,9 +178,11 @@ export function createMiniApp(options: MiniAppOptions) {
 
   async function serveStatic(response: ServerResponse, pathname: string): Promise<void> {
     const root = path.resolve(webRoot);
-    const relative =
-      pathname === "/" || pathname === "/app" ? "index.html" : pathname.replace(/^\/app\//, "");
-    const target = path.resolve(root, relative);
+    const relative = pathname
+      .replace(/^\/app\//, "")
+      .replace(/^\//, "")
+      .trim();
+    const target = path.resolve(root, relative === "" ? "index.html" : relative);
     const inside = path.relative(root, target);
     if (inside.startsWith("..") || path.isAbsolute(inside)) {
       sendJson(response, 403, { ok: false, error: "forbidden" });
@@ -190,8 +191,13 @@ export function createMiniApp(options: MiniAppOptions) {
 
     const info = await stat(target).catch(() => null);
     if (!info?.isFile()) {
+      // A missing file with an extension is a missing file, not a page.
+      if (path.extname(relative) !== "") {
+        sendJson(response, 404, { ok: false, error: "not found" });
+        return;
+      }
       // The Mini App is a single page, every unknown path leads to it.
-      const index = path.resolve(webRoot, "index.html");
+      const index = path.resolve(root, "index.html");
       const html = await readFile(index).catch(() => null);
       if (!html) {
         sendJson(response, 404, { ok: false, error: "the mini app is not built" });
