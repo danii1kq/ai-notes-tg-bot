@@ -62,6 +62,8 @@ const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif
  * The content security policy keeps the scripts of the page to the app itself
  * and to the SDK of Telegram. The referrer policy stops the address of the
  * page (with the token of the owner in it) from travelling to other sites.
+ * The frames are allowed for the clients of Telegram, they are the only ones
+ * that show the app.
  */
 const SECURITY_HEADERS: Record<string, string> = {
   "Content-Security-Policy": [
@@ -78,7 +80,6 @@ const SECURITY_HEADERS: Record<string, string> = {
   ].join("; "),
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
-  "X-Frame-Options": "SAMEORIGIN",
   "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
 };
 
