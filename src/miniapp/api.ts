@@ -26,6 +26,8 @@ export interface MiniAppOptions {
   summaries?: () => Promise<SummaryEntry[]>;
   /** The file for the data that was not accepted, for the diagnostics. */
   debugFile?: string;
+  /** The name of the bot, for the button that opens the chat with it. */
+  botUsername?: () => string;
 }
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -85,6 +87,11 @@ export function createMiniApp(options: MiniAppOptions) {
     }
 
     try {
+      if (pathname === "/api/config") {
+        sendJson(response, 200, { ok: true, botUsername: options.botUsername?.() ?? "" });
+        return;
+      }
+
       if (pathname === "/api/summaries") {
         const entries = options.summaries ? await options.summaries() : [];
         sendJson(response, 200, { ok: true, summaries: entries });

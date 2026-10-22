@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  fetchConfig,
   fetchNote,
   fetchNotes,
   fetchSummaries,
@@ -9,6 +10,17 @@ import {
   type SummaryEntry,
   searchNotes,
 } from "./api";
+import {
+  AlertIcon,
+  BackIcon,
+  ChevronIcon,
+  CloseIcon,
+  InboxIcon,
+  NoteIcon,
+  ReportIcon,
+  RetryIcon,
+  SearchIcon,
+} from "./icons";
 import { renderMarkdown } from "./markdown";
 
 type View = { name: "list" } | { name: "note"; path: string; title: string };
@@ -20,7 +32,7 @@ function haptic(kind: "light" | "medium" | "success" = "light"): void {
     if (kind === "success") telegram?.HapticFeedback.notificationOccurred("success");
     else telegram?.HapticFeedback.impactOccurred(kind);
   } catch {
-    // The haptics are not available everywhere.
+    // The haptics are not everywhere.
   }
 }
 
@@ -30,16 +42,15 @@ export default function App() {
   const [notes, setNotes] = useState<NoteSummary[]>([]);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [summaries, setSummaries] = useState<SummaryEntry[]>([]);
+  const [botUsername, setBotUsername] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // The list of the notes.
   const loadNotes = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const list = await fetchNotes(80);
-      setNotes(list);
-      setError(null);
+      setNotes(await fetchNotes(80));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "не удалось загрузить заметки");
     } finally {
@@ -50,10 +61,21 @@ export default function App() {
   useEffect(() => {
     telegram?.ready();
     telegram?.expand();
+    // The header of Telegram takes the colour of the app, so there is no seam.
+    try {
+      if (telegram?.themeParams?.bg_color) {
+        telegram.setHeaderColor?.(telegram.themeParams.bg_color);
+      }
+    } catch {
+      // The colour of the header is not important enough to fail for.
+    }
     void loadNotes();
     fetchSummaries()
-      .then((list) => setSummaries(list))
+      .then(setSummaries)
       .catch(() => setSummaries([]));
+    fetchConfig()
+      .then((config) => setBotUsername(config.botUsername))
+      .catch(() => setBotUsername(""));
   }, [loadNotes]);
 
   // The search waits for a pause in the typing.
@@ -65,7 +87,7 @@ export default function App() {
     }
     const timer = setTimeout(() => {
       searchNotes(trimmed)
-        .then((found) => setHits(found))
+        .then(setHits)
         .catch(() => setHits([]));
     }, 250);
     return () => clearTimeout(timer);
@@ -83,6 +105,11 @@ export default function App() {
     };
   }, [view.name]);
 
+  const openNote = (path: string, title: string) => {
+    haptic();
+    setView({ name: "note", path, title });
+  };
+
   const searching = query.trim().length > 0;
 
   return (
@@ -97,7 +124,7 @@ export default function App() {
                 : `${notes.length} ${plural(notes.length, "заметка", "заметки", "заметок")}`}
             </p>
             <div className="search">
-              <span aria-hidden="true">🔍</span>
+              <SearchIcon size={18} />
               <input
                 type="search"
                 inputMode="search"
@@ -106,15 +133,35 @@ export default function App() {
                 onChange={(event) => setQuery(event.target.value)}
                 aria-label="Поиск по заметкам"
               />
+              {query ? (
+                <button
+                  className="clear"
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    haptic();
+                  }}
+                  aria-label="Очистить поиск"
+                >
+                  <CloseIcon size={16} />
+                </button>
+              ) : null}
             </div>
           </header>
 
           {error ? (
-            <div className="state">
-              <div className="state-icon">⚠️</div>
-              <div className="state-title">Не удалось загрузить</div>
-              <div className="state-hint">{error}</div>
-            </div>
+            <State
+              icon={<AlertIcon size={26} />}
+              danger
+              title="Не удалось загрузить"
+              hint={error}
+              action={
+                <button className="action" type="button" onClick={() => void loadNotes()}>
+                  <RetryIcon size={18} />
+                  Повторить
+                </button>
+              }
+            />
           ) : loading ? (
             <div className="list">
               <div className="skeleton" />
@@ -122,20 +169,24 @@ export default function App() {
               <div className="skeleton" />
             </div>
           ) : searching ? (
-            <HitList hits={hits} onOpen={(hit) => openNote(hit.path, hit.title, setView)} />
+            <HitList hits={hits} onOpen={openNote} />
           ) : notes.length === 0 ? (
-            <div className="state">
-              <div className="state-icon">🗂</div>
-              <div className="state-title">Пока пусто</div>
-              <div className="state-hint">Напиши боту в Telegram, и заметка появится здесь.</div>
-            </div>
+            <State
+              icon={<InboxIcon size={26} />}
+              title="Пока пусто"
+              hint="Напиши боту в Telegram, и заметка появится здесь."
+              action={
+                botUsername ? (
+                  <button className="action" type="button" onClick={() => openBotChat(botUsername)}>
+                    Написать боту
+                  </button>
+                ) : undefined
+              }
+            />
           ) : (
             <>
-              <SummaryCard
-                summaries={summaries}
-                onOpen={(path, title) => openNote(path, title, setView)}
-              />
-              <NoteList notes={notes} onOpen={(note) => openNote(note.path, note.title, setView)} />
+              <SummaryCard summaries={summaries} onOpen={openNote} />
+              <NoteList notes={notes} onOpen={openNote} />
             </>
           )}
         </>
@@ -146,9 +197,14 @@ export default function App() {
   );
 }
 
-function openNote(path: string, title: string, setView: (view: View) => void): void {
-  haptic();
-  setView({ name: "note", path, title });
+/** Opens the chat with the bot, from the Mini App or from the browser. */
+function openBotChat(username: string): void {
+  const url = `https://t.me/${username}`;
+  if (telegram?.openTelegramLink) {
+    telegram.openTelegramLink(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener");
 }
 
 function SummaryCard({
@@ -162,18 +218,31 @@ function SummaryCard({
   if (!latest) return null;
 
   return (
-    <button
-      className="card card-summary"
-      type="button"
-      onClick={() => onOpen(latest.file, "Итоги дня")}
-    >
-      <h2 className="card-title">Итоги дня</h2>
-      <div className="card-meta">
-        <span>{formatDate(latest.date)}</span>
-        {summaries.length > 1 ? <span>дней: {summaries.length}</span> : null}
-      </div>
-      <p className="card-snippet">{latest.summary}</p>
-    </button>
+    <ul className="list">
+      <li>
+        <button
+          className="card card-summary"
+          type="button"
+          onClick={() => onOpen(latest.file, "Итоги дня")}
+          aria-label={`Итоги дня, ${formatDate(latest.date)}`}
+        >
+          <span className="card-icon">
+            <ReportIcon size={20} />
+          </span>
+          <span className="card-body">
+            <span className="card-title">Итоги дня</span>
+            <span className="card-meta">
+              <span>{formatDate(latest.date)}</span>
+              {summaries.length > 1 ? <span>дней: {summaries.length}</span> : null}
+            </span>
+            <span className="card-snippet">{latest.summary}</span>
+          </span>
+          <span className="card-chevron">
+            <ChevronIcon size={18} />
+          </span>
+        </button>
+      </li>
+    </ul>
   );
 }
 
@@ -182,50 +251,110 @@ function NoteList({
   onOpen,
 }: {
   notes: NoteSummary[];
-  onOpen: (note: NoteSummary) => void;
+  onOpen: (path: string, title: string) => void;
 }) {
   return (
-    <div className="list">
+    <ul className="list">
       {notes.map((note) => (
-        <button key={note.path} className="card" type="button" onClick={() => onOpen(note)}>
-          <h2 className="card-title">{note.title}</h2>
-          <div className="card-meta">
-            {note.date ? <span>{formatDate(note.date)}</span> : null}
-            {note.tags.slice(0, 3).map((tag) => (
-              <span className="chip" key={tag}>
-                #{tag}
+        <li key={note.path}>
+          <button
+            className="card"
+            type="button"
+            onClick={() => onOpen(note.path, note.title)}
+            aria-label={`Открыть заметку ${note.title}`}
+          >
+            <span className="card-icon">
+              <NoteIcon size={20} />
+            </span>
+            <span className="card-body">
+              <span className="card-title">{note.title}</span>
+              <span className="card-meta">
+                {note.date ? <span>{formatDate(note.date)}</span> : null}
+                {note.tags.slice(0, 3).map((tag) => (
+                  <span className="chip" key={tag}>
+                    #{tag}
+                  </span>
+                ))}
               </span>
-            ))}
-          </div>
-          {note.snippet ? <p className="card-snippet">{note.snippet}</p> : null}
-        </button>
+              {note.snippet ? <span className="card-snippet">{note.snippet}</span> : null}
+            </span>
+            <span className="card-chevron">
+              <ChevronIcon size={18} />
+            </span>
+          </button>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
-function HitList({ hits, onOpen }: { hits: SearchHit[]; onOpen: (hit: SearchHit) => void }) {
+function HitList({
+  hits,
+  onOpen,
+}: {
+  hits: SearchHit[];
+  onOpen: (path: string, title: string) => void;
+}) {
   if (hits.length === 0) {
     return (
-      <div className="state">
-        <div className="state-icon">🔍</div>
-        <div className="state-title">Ничего не нашлось</div>
-        <div className="state-hint">Попробуй другое слово.</div>
-      </div>
+      <State
+        icon={<SearchIcon size={26} />}
+        title="Ничего не нашлось"
+        hint="Попробуй другое слово."
+      />
     );
   }
+
   return (
-    <div className="list">
+    <ul className="list">
       {hits.map((hit) => (
-        <button key={hit.path} className="card" type="button" onClick={() => onOpen(hit)}>
-          <h2 className="card-title">{hit.title}</h2>
-          <div className="card-meta">
-            <span>{hit.path}</span>
-            {hit.line ? <span>строка {hit.line}</span> : null}
-          </div>
-          {hit.snippet ? <p className="card-snippet">{hit.snippet}</p> : null}
-        </button>
+        <li key={hit.path}>
+          <button
+            className="card"
+            type="button"
+            onClick={() => onOpen(hit.path, hit.title)}
+            aria-label={`Открыть заметку ${hit.title}`}
+          >
+            <span className="card-icon">
+              <NoteIcon size={20} />
+            </span>
+            <span className="card-body">
+              <span className="card-title">{hit.title}</span>
+              <span className="card-meta">
+                <span>{hit.path}</span>
+                {hit.line ? <span>строка {hit.line}</span> : null}
+              </span>
+              {hit.snippet ? <span className="card-snippet">{hit.snippet}</span> : null}
+            </span>
+            <span className="card-chevron">
+              <ChevronIcon size={18} />
+            </span>
+          </button>
+        </li>
       ))}
+    </ul>
+  );
+}
+
+function State({
+  icon,
+  title,
+  hint,
+  action,
+  danger = false,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  hint: string;
+  action?: React.ReactNode;
+  danger?: boolean;
+}) {
+  return (
+    <div className="state">
+      <span className={danger ? "state-icon state-icon-danger" : "state-icon"}>{icon}</span>
+      <span className="state-title">{title}</span>
+      <span className="state-hint">{hint}</span>
+      {action}
     </div>
   );
 }
@@ -260,16 +389,20 @@ function NoteView({ path, title, onBack }: { path: string; title: string; onBack
 
   return (
     <div className="note">
-      <button className="back" type="button" onClick={onBack}>
-        <span aria-hidden="true">←</span> Назад
+      <button
+        className="back"
+        type="button"
+        onClick={() => {
+          haptic();
+          onBack();
+        }}
+      >
+        <BackIcon size={18} />
+        Назад
       </button>
-      <h1 className="title">{title}</h1>
+      <h1 className="note-title">{title}</h1>
       {error ? (
-        <div className="state">
-          <div className="state-icon">⚠️</div>
-          <div className="state-title">Не удалось открыть</div>
-          <div className="state-hint">{error}</div>
-        </div>
+        <State icon={<AlertIcon size={26} />} danger title="Не удалось открыть" hint={error} />
       ) : content === null ? (
         <div className="list">
           <div className="skeleton" />

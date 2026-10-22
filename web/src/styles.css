@@ -1,38 +1,59 @@
 /* The design of the Mini App.
  *
- * Every colour comes from the theme of Telegram, so the app looks native in
- * the light and in the dark mode. The spacing follows the 8 point grid.
+ * The colours come from the theme of Telegram, so the app looks native in the
+ * light and in the dark mode. The values of the fallbacks are for the browser,
+ * where there is no Telegram around. The spacing follows the 8 point grid.
  */
 
 :root {
-  --bg: var(--tg-theme-bg-color, #ffffff);
-  --fg: var(--tg-theme-text-color, #171717);
-  --hint: var(--tg-theme-hint-color, #8e8e93);
-  --link: var(--tg-theme-link-color, #2f7cf6);
-  --button: var(--tg-theme-button-color, #2f7cf6);
-  --button-text: var(--tg-theme-button-text-color, #ffffff);
-  --secondary-bg: var(--tg-theme-secondary-bg-color, #f2f2f7);
-  --section-bg: var(--tg-theme-section-bg-color, #ffffff);
-  --separator: var(--tg-theme-section-separator-color, rgba(17, 17, 17, 0.12));
-  --header-bg: var(--tg-theme-header-bg-color, var(--bg));
-  --destructive: var(--tg-theme-destructive-text-color, #e5484d);
-  --accent-text: var(--tg-theme-accent-text-color, var(--link));
+  color-scheme: light dark;
 
-  --radius-card: 16px;
+  /* --- The tokens of the theme -------------------------------------------
+   * The values of Telegram are the source of truth. The second value of
+   * every var() is the fallback for the browser.
+   */
+  --surface: var(--tg-theme-bg-color, #ffffff);
+  --surface-raised: var(--tg-theme-section-bg-color, #ffffff);
+  --surface-sunken: var(--tg-theme-secondary-bg-color, #f1f1f4);
+  --text: var(--tg-theme-text-color, #101014);
+  --text-muted: color-mix(in srgb, var(--tg-theme-text-color, #101014) 64%, transparent);
+  --text-faint: color-mix(in srgb, var(--tg-theme-text-color, #101014) 46%, transparent);
+  --accent: var(--tg-theme-link-color, #2f7cf6);
+  --accent-text: var(--tg-theme-accent-text-color, var(--tg-theme-link-color, #2f7cf6));
+  --danger: var(--tg-theme-destructive-text-color, #e5484d);
+  --border: var(--tg-theme-section-separator-color, rgba(17, 17, 17, 0.14));
+  --fill: color-mix(in srgb, var(--tg-theme-text-color, #101014) 7%, transparent);
+  --fill-strong: color-mix(in srgb, var(--tg-theme-text-color, #101014) 12%, transparent);
+  --accent-fill: color-mix(in srgb, var(--tg-theme-link-color, #2f7cf6) 12%, transparent);
+  --accent-border: color-mix(in srgb, var(--tg-theme-link-color, #2f7cf6) 34%, transparent);
+  --danger-fill: color-mix(
+    in srgb,
+    var(--tg-theme-destructive-text-color, #e5484d) 12%,
+    transparent
+  );
+
+  /* --- The rhythm -------------------------------------------------------- */
+  --radius-card: 14px;
   --radius-field: 12px;
   --radius-chip: 999px;
-
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-6: 24px;
-  --space-8: 32px;
+  --gutter: 16px;
+  --duration-fast: 120ms;
+  --duration: 180ms;
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
 
-  --shadow-card: 0 1px 2px rgba(17, 17, 17, 0.04), 0 8px 24px rgba(17, 17, 17, 0.06);
+/* Outside of Telegram the app follows the system theme. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: var(--tg-theme-bg-color, #0d0d10);
+    --surface-raised: var(--tg-theme-section-bg-color, #1a1a1f);
+    --surface-sunken: var(--tg-theme-secondary-bg-color, #24242a);
+    --text: var(--tg-theme-text-color, #f2f2f7);
+    --border: var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.14));
+  }
 }
 
 * {
@@ -44,12 +65,13 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
-  color: var(--fg);
+  background: var(--surface);
+  color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  font-size: 15px;
-  line-height: 1.45;
+  font-size: 16px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
 }
 
 #root {
@@ -59,8 +81,26 @@ body {
 .app {
   max-width: 720px;
   margin: 0 auto;
-  padding: calc(var(--safe-top) + var(--space-4)) var(--space-4)
-    calc(var(--safe-bottom) + var(--space-8));
+  padding: 0 var(--gutter) calc(var(--safe-bottom) + 32px);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: 24px;
+  }
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* The focus has to be visible, the keyboard is a way to use the app. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 /* --- The header ------------------------------------------------------------ */
@@ -69,22 +109,25 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  margin: calc(-1 * var(--safe-top)) calc(-1 * var(--space-4)) 0;
-  padding: calc(var(--safe-top) + var(--space-4)) var(--space-4) var(--space-3);
-  background: color-mix(in srgb, var(--header-bg) 88%, transparent);
+  padding: calc(var(--safe-top) + 16px) var(--gutter) 12px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: saturate(180%) blur(12px);
+  margin: 0 calc(-1 * var(--gutter));
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
 }
 
 .title {
-  margin: 0 0 var(--space-3);
+  margin: 0 0 2px;
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.01em;
+  line-height: 1.25;
 }
 
 .subtitle {
-  margin: 0 0 var(--space-3);
-  color: var(--hint);
+  margin: 0 0 12px;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -93,12 +136,18 @@ body {
 .search {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  height: 44px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--separator);
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 8px 0 12px;
+  border: 1px solid transparent;
   border-radius: var(--radius-field);
-  background: var(--secondary-bg);
+  background: var(--surface-sunken);
+  color: var(--text-muted);
+  transition: border-color var(--duration-fast) var(--ease);
+}
+
+.search:focus-within {
+  border-color: var(--accent);
 }
 
 .search input {
@@ -107,14 +156,44 @@ body {
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   /* 16px and more, so iOS does not zoom when the field is focused. */
   font-size: 16px;
   font-family: inherit;
+  line-height: 1.4;
+  padding: 10px 0;
 }
 
 .search input::placeholder {
-  color: var(--hint);
+  color: var(--text-faint);
+}
+
+.search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: var(--fill);
+  color: var(--text-muted);
+  transition:
+    background-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.clear:hover {
+  background: var(--fill-strong);
+  color: var(--text);
+}
+
+.clear:active {
+  transform: scale(0.94);
 }
 
 /* --- The list of the notes ------------------------------------------------- */
@@ -122,53 +201,69 @@ body {
 .list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
 .card {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   width: 100%;
-  padding: var(--space-4);
-  border: 1px solid var(--separator);
+  padding: 14px 14px 14px 16px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  background: var(--section-bg);
-  box-shadow: var(--shadow-card);
-  color: inherit;
+  background: var(--surface-raised);
   text-align: left;
-  font: inherit;
-  cursor: pointer;
   transition:
-    transform 120ms ease,
-    opacity 120ms ease;
+    background-color var(--duration-fast) var(--ease),
+    border-color var(--duration-fast) var(--ease);
+}
+
+.card:hover {
+  border-color: color-mix(in srgb, var(--text) 22%, var(--border));
 }
 
 .card:active {
-  transform: scale(0.985);
-  opacity: 0.92;
+  background: var(--fill);
+}
+
+.card-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--text-faint);
+}
+
+.card-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .card-title {
-  margin: 0 0 var(--space-1);
-  font-size: 17px;
+  margin: 0 0 2px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.01em;
+  line-height: 1.35;
 }
 
 .card-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-  color: var(--hint);
+  gap: 6px;
+  margin-bottom: 4px;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
 .card-snippet {
   margin: 0;
-  color: color-mix(in srgb, var(--fg) 72%, transparent);
+  color: var(--text-muted);
   font-size: 14px;
+  line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -176,42 +271,96 @@ body {
   overflow: hidden;
 }
 
-/* The card of the summaries of the days, it stands out a little. */
-.card-summary {
-  border-color: color-mix(in srgb, var(--link) 22%, var(--separator));
-  background: color-mix(in srgb, var(--link) 6%, var(--section-bg));
-}
-
-.card-summary .card-title {
-  color: var(--accent-text);
+.card-chevron {
+  flex: none;
+  align-self: center;
+  color: var(--text-faint);
 }
 
 .chip {
-  padding: 2px var(--space-2);
+  padding: 1px 8px;
   border-radius: var(--radius-chip);
-  background: color-mix(in srgb, var(--link) 12%, transparent);
+  background: var(--accent-fill);
   color: var(--accent-text);
   font-size: 12px;
   font-weight: 500;
+  line-height: 1.5;
+}
+
+/* The card of the summary of the day, it stands out a little. */
+.card-summary {
+  border-color: var(--accent-border);
+  background: color-mix(in srgb, var(--accent-fill) 55%, var(--surface-raised));
+}
+
+.card-summary .card-icon,
+.card-summary .card-title {
+  color: var(--accent-text);
 }
 
 /* --- The note -------------------------------------------------------------- */
 
 .note {
-  margin-top: var(--space-4);
+  margin-top: 16px;
+}
+
+.note-title {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.note-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  margin: 8px 0 4px;
+  padding: 0 16px 0 8px;
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: var(--fill);
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color var(--duration-fast) var(--ease);
+}
+
+.back:hover {
+  background: var(--fill-strong);
+}
+
+.back:active {
+  background: var(--fill-strong);
 }
 
 .note-body {
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 68ch;
 }
 
 .note-body h1,
 .note-body h2,
 .note-body h3 {
-  margin: var(--space-6) 0 var(--space-2);
+  margin: 28px 0 8px;
   font-size: 17px;
   font-weight: 650;
   letter-spacing: -0.01em;
+  line-height: 1.35;
 }
 
 .note-body h1:first-child,
@@ -221,39 +370,39 @@ body {
 }
 
 .note-body p {
-  margin: 0 0 var(--space-3);
+  margin: 0 0 12px;
 }
 
 .note-body ul,
 .note-body ol {
-  margin: 0 0 var(--space-3);
-  padding-left: var(--space-6);
+  margin: 0 0 12px;
+  padding-left: 22px;
 }
 
 .note-body li {
-  margin-bottom: var(--space-1);
+  margin-bottom: 4px;
 }
 
 .note-body blockquote {
-  margin: 0 0 var(--space-3);
-  padding-left: var(--space-3);
-  border-left: 3px solid var(--separator);
-  color: var(--hint);
+  margin: 0 0 12px;
+  padding-left: 12px;
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
 }
 
 .note-body code {
   padding: 2px 6px;
   border-radius: 6px;
-  background: var(--secondary-bg);
+  background: var(--fill);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .note-body pre {
-  margin: 0 0 var(--space-3);
-  padding: var(--space-3);
+  margin: 0 0 12px;
+  padding: 12px;
   border-radius: var(--radius-field);
-  background: var(--secondary-bg);
+  background: var(--surface-sunken);
   overflow-x: auto;
 }
 
@@ -263,41 +412,22 @@ body {
 }
 
 .note-body a {
-  color: var(--link);
+  color: var(--accent-text);
   text-decoration: none;
 }
 
 .note-body img {
   display: block;
   width: 100%;
-  margin: var(--space-3) 0;
+  height: auto;
+  margin: 12px 0;
   border-radius: var(--radius-field);
 }
 
 .note-body hr {
-  margin: var(--space-6) 0;
+  margin: 24px 0;
   border: 0;
-  border-top: 1px solid var(--separator);
-}
-
-.back {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 44px;
-  margin-bottom: var(--space-2);
-  padding: 0 var(--space-3) 0 var(--space-2);
-  border: 1px solid var(--separator);
-  border-radius: var(--radius-chip);
-  background: var(--section-bg);
-  color: var(--link);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.back:active {
-  opacity: 0.7;
+  border-top: 1px solid var(--border);
 }
 
 /* --- The states ------------------------------------------------------------ */
@@ -306,53 +436,102 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-8);
-  padding: var(--space-6);
-  color: var(--hint);
+  gap: 8px;
+  margin-top: 48px;
+  padding: 24px 16px;
+  color: var(--text-muted);
   text-align: center;
 }
 
 .state-icon {
-  font-size: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-chip);
+  background: var(--fill);
+  color: var(--text-faint);
+}
+
+.state-icon-danger {
+  background: var(--danger-fill);
+  color: var(--danger);
 }
 
 .state-title {
-  color: var(--fg);
+  color: var(--text);
   font-size: 17px;
   font-weight: 600;
 }
 
 .state-hint {
+  max-width: 32ch;
   font-size: 14px;
 }
 
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: var(--accent);
+  color: var(--tg-theme-button-text-color, #ffffff);
+  font-size: 15px;
+  font-weight: 500;
+  transition: opacity var(--duration-fast) var(--ease);
+}
+
+.action:hover {
+  opacity: 0.9;
+}
+
+.action:active {
+  opacity: 0.78;
+}
+
+.action-quiet {
+  background: var(--fill);
+  color: var(--text);
+}
+
+/* --- The loading ----------------------------------------------------------- */
+
 .skeleton {
-  height: 84px;
+  height: 78px;
   border-radius: var(--radius-card);
-  background: linear-gradient(
-    90deg,
-    var(--secondary-bg) 25%,
-    color-mix(in srgb, var(--secondary-bg) 60%, var(--bg)) 50%,
-    var(--secondary-bg) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+  background: var(--fill);
+  animation: shimmer 1.4s var(--ease) infinite;
 }
 
 @keyframes shimmer {
   from {
-    background-position: 200% 0;
+    opacity: 0.55;
   }
   to {
-    background-position: -200% 0;
+    opacity: 1;
   }
 }
 
+/* Without the movement the app stays calm: the times of the transitions come
+   from the tokens, so the movement stops everywhere at once. */
 @media (prefers-reduced-motion: reduce) {
-  .card,
+  :root {
+    --duration-fast: 0.01ms;
+    --duration: 0.01ms;
+  }
+
   .skeleton {
-    transition: none;
     animation: none;
+  }
+
+  .clear:active,
+  .back:active {
+    transform: none;
   }
 }

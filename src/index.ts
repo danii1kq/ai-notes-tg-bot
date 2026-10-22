@@ -237,6 +237,15 @@ async function main(): Promise<void> {
     timeZone: config.vault.timeZone,
   });
 
+  // The name of the bot, for the button of the Mini App that opens the chat.
+  let botUsername = "";
+  try {
+    const me = await bot.api.getMe();
+    botUsername = me.username ?? "";
+  } catch (error) {
+    logger.warn("could not read the name of the bot", { error: String(error) });
+  }
+
   const miniApp = createMiniApp({
     vault,
     botToken: config.telegram.botToken,
@@ -244,6 +253,7 @@ async function main(): Promise<void> {
     logger: logger.child("miniapp"),
     webRoot: config.miniApp.webRoot,
     debugFile: config.miniApp.debugFile,
+    botUsername: () => botUsername,
     summaries: async () => {
       const rows = await db
         .select()

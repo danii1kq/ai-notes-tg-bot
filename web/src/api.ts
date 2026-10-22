@@ -73,3 +73,9 @@ export async function fetchSummaries(): Promise<SummaryEntry[]> {
   const payload = await request<{ summaries: SummaryEntry[] }>("/api/summaries");
   return payload.summaries;
 }
+
+/** The settings of the app, the name of the bot. */
+export async function fetchConfig(): Promise<{ botUsername: string }> {
+  const payload = await request<{ botUsername: string }>("/api/config");
+  return payload;
+}

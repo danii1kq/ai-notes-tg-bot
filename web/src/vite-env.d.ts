@@ -11,6 +11,10 @@ declare global {
         close(): void;
         colorScheme: "light" | "dark";
         themeParams: Record<string, string>;
+        setHeaderColor?(color: string): void;
+        setBackgroundColor?(color: string): void;
+        openLink?(url: string, options?: { try_instant_view?: boolean }): void;
+        openTelegramLink?(url: string): void;
         BackButton: {
           show(): void;
           hide(): void;

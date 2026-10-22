@@ -22,7 +22,6 @@ function escapeHtml(text: string): string {
 function renderInline(text: string, fileToken: string): string {
   const placeholders: string[] = [];
   const masked = text.replace(
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: the placeholder is exactly what has to be found
     /!\[\[([^\]]+)\]\]|\[\[([^\]]+)\]\]|`([^`]+)`/g,
     (_match, embed: string | undefined, wiki: string | undefined, code: string | undefined) => {
       if (embed !== undefined) {
