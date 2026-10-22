@@ -33,9 +33,13 @@ function fakeResponse() {
   const response = {
     statusCode: 200,
     headers: {} as Record<string, string>,
+    setHeader(name: string, value: string) {
+      response.headers[name] = value;
+      return response;
+    },
     writeHead(status: number, headers: Record<string, string>) {
       response.statusCode = status;
-      response.headers = headers;
+      response.headers = { ...response.headers, ...headers };
       return response;
     },
     end(body?: Buffer | string) {
@@ -44,7 +48,10 @@ function fakeResponse() {
     },
     body: () => Buffer.concat(chunks).toString("utf8"),
   };
-  return response as unknown as ServerResponse & { body: () => string };
+  return response as unknown as ServerResponse & {
+    body: () => string;
+    headers: Record<string, string>;
+  };
 }
 
 async function makeMiniApp() {
@@ -185,5 +192,33 @@ describe("the api of the mini app", () => {
 
     const payload = JSON.parse(response.body()) as { note: { content: string } };
     expect(payload.note.content).toContain("an idea");
+  });
+
+  it("opens a session for the data of telegram, so a picture can be asked for", async () => {
+    const { handle } = await makeMiniApp();
+    const initData = signInitData({
+      auth_date: String(Math.floor(Date.now() / 1000)),
+      query_id: "AAE_test",
+    });
+    const response = fakeResponse();
+    await handle(fakeRequest("/api/notes", { "x-telegram-init-data": initData }), response);
+
+    expect(response.statusCode).toBe(200);
+    const cookie = response.headers["Set-Cookie"] ?? "";
+    expect(cookie).toContain("vault_session=");
+    expect(cookie).toContain("HttpOnly");
+  });
+
+  it("gives the notes with the path, the app works with it", async () => {
+    const { handle } = await makeMiniApp();
+    const response = fakeResponse();
+    await handle(fakeRequest("/api/notes?token=secret-token"), response);
+
+    const payload = JSON.parse(response.body()) as {
+      notes: Array<{ path: string; title: string; date: string; tags: string[] }>;
+    };
+    expect(payload.notes[0]?.path).toBe("Ideas.md");
+    expect(payload.notes[0]?.title).toBe("Ideas");
+    expect(Array.isArray(payload.notes[0]?.tags)).toBe(true);
   });
 });

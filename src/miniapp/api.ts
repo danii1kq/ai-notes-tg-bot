@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
@@ -62,6 +63,18 @@ const CONTENT_TYPES: Record<string, string> = {
 export function createMiniApp(options: MiniAppOptions) {
   const { vault, botToken, browserToken, logger, webRoot } = options;
 
+  /**
+   * The sessions of the Mini App.
+   *
+   * The data of Telegram comes in a header, but a picture in a note is asked
+   * for by the browser itself, and a picture cannot carry a header. So the
+   * first request with the signed data opens a session, and the session
+   * lives in a cookie.
+   */
+  const sessions = new Map<string, number>();
+  const sessionCookie = "vault_session";
+  const sessionLifetime = 86_400_000;
+
   return async function handle(
     request: IncomingMessage,
     response: ServerResponse,
@@ -70,6 +83,18 @@ export function createMiniApp(options: MiniAppOptions) {
     const pathname = url.pathname;
 
     if (pathname.startsWith("/api/")) {
+      const auth = await authorize(request, url);
+      if (!auth.ok) {
+        logger.warn("a request to the mini app was not allowed", { path: pathname });
+        sendJson(response, 401, { ok: false, error: "not allowed" });
+        return true;
+      }
+      if (auth.session) {
+        response.setHeader(
+          "Set-Cookie",
+          `${sessionCookie}=${auth.session}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400`,
+        );
+      }
       await handleApi(request, response, url, pathname);
       return true;
     }
@@ -81,18 +106,60 @@ export function createMiniApp(options: MiniAppOptions) {
     return true;
   };
 
+  /**
+   * Checks the request: the signed data of Telegram, the session of the
+   * Mini App or the token of the owner.
+   */
+  async function authorize(
+    request: IncomingMessage,
+    url: URL,
+  ): Promise<{ ok: boolean; userId?: number; session?: string }> {
+    const initData = request.headers["x-telegram-init-data"];
+    if (typeof initData === "string" && initData.length > 0) {
+      const result = validateInitData(initData, botToken);
+      if (!result.ok) {
+        logger.warn("the init data of telegram was not accepted", {
+          reason: result.error,
+          length: initData.length,
+          fields: [...new URLSearchParams(initData).keys()],
+        });
+        void saveDebug(initData);
+        return { ok: false };
+      }
+
+      const session = randomBytes(24).toString("hex");
+      sessions.set(session, Date.now() + sessionLifetime);
+      return { ok: true, userId: result.user?.id, session };
+    }
+
+    // The session of the Mini App, it is in the cookie.
+    const cookies = request.headers.cookie ?? "";
+    for (const part of cookies.split(";")) {
+      const [name, value] = part.trim().split("=");
+      if (name !== sessionCookie || !value) continue;
+      const expiry = sessions.get(value);
+      if (expiry && expiry > Date.now()) {
+        return { ok: true };
+      }
+      sessions.delete(value);
+    }
+
+    const header = request.headers["x-auth-token"];
+    const token = typeof header === "string" ? header : url.searchParams.get("token");
+    if (token && browserToken && token === browserToken) return { ok: true };
+
+    logger.warn("a request to the mini app came without the data of telegram", {
+      path: url.pathname,
+    });
+    return { ok: false };
+  }
+
   async function handleApi(
     request: IncomingMessage,
     response: ServerResponse,
     url: URL,
     pathname: string,
   ): Promise<void> {
-    if (!isAllowed(request, url)) {
-      logger.warn("a request to the mini app was not allowed", { path: pathname });
-      sendJson(response, 401, { ok: false, error: "not allowed" });
-      return;
-    }
-
     try {
       if (pathname === "/api/config") {
         const userId = await currentUserId(request, url);
@@ -117,7 +184,20 @@ export function createMiniApp(options: MiniAppOptions) {
         const limit = clamp(Number(url.searchParams.get("limit") ?? 60), 1, 200);
         const offset = Math.max(0, Number(url.searchParams.get("offset") ?? 0) || 0);
         const notes = await vault.listNotesDetailed(limit + offset);
-        sendJson(response, 200, { ok: true, notes: notes.slice(offset) });
+        // The app works with the path of the note, the name of the file is a
+        // detail of the vault.
+        sendJson(response, 200, {
+          ok: true,
+          notes: notes.slice(offset).map((note) => ({
+            path: note.relativePath,
+            title: note.title,
+            date: note.date,
+            tags: note.tags,
+            snippet: note.snippet,
+            size: note.size,
+            mtimeMs: note.mtimeMs,
+          })),
+        });
         return;
       }
 
@@ -201,31 +281,6 @@ export function createMiniApp(options: MiniAppOptions) {
     const token = typeof header === "string" ? header : url.searchParams.get("token");
     if (token && browserToken && token === browserToken) return options.ownerId;
     return undefined;
-  }
-
-  /** The signed data of Telegram or the token of the owner. */
-  function isAllowed(request: IncomingMessage, url: URL): boolean {
-    const initData = request.headers["x-telegram-init-data"];
-    if (typeof initData === "string" && initData.length > 0) {
-      const result = validateInitData(initData, botToken);
-      if (result.ok) return true;
-      logger.warn("the init data of telegram was not accepted", {
-        reason: result.error,
-        length: initData.length,
-        fields: [...new URLSearchParams(initData).keys()],
-      });
-      void saveDebug(initData);
-      return false;
-    }
-
-    const header = request.headers["x-auth-token"];
-    const token = typeof header === "string" ? header : url.searchParams.get("token");
-    if (token && browserToken && token === browserToken) return true;
-
-    logger.warn("a request to the mini app came without the data of telegram", {
-      path: url.pathname,
-    });
-    return false;
   }
 
   /**
