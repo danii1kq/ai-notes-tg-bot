@@ -229,14 +229,13 @@ The description of the package is in [packages/vault-mcp](packages/vault-mcp).
 
 ### Syncthing and your laptop
 
-1. The web interface of Syncthing is on the port 8384 of the server:
+1. The web interface of Syncthing is on the port 8384 of the server. It is
+   not open to the internet, the owner reaches it through a tunnel:
 
    ```bash
    ssh -L 8384:127.0.0.1:8384 user@your-server
    # then open http://127.0.0.1:8384
    ```
-
-   Or open `http://your-server:8384` directly, if the firewall allows it.
 
 2. In the web interface: `Actions` -> `Show ID`, this is the id of the server.
 
@@ -526,14 +525,13 @@ OBSIDIAN_VAULT_PATH=/path/to/vault vault-mcp
 
 ### Syncthing и ноутбук
 
-1. Веб-интерфейс Syncthing на порту 8384 сервера:
+1. Веб-интерфейс Syncthing на порту 8384 сервера. В интернет он не открыт,
+   владелец заходит в него через туннель:
 
    ```bash
    ssh -L 8384:127.0.0.1:8384 user@your-server
    # открыть http://127.0.0.1:8384
    ```
-
-   Или сразу `http://your-server:8384`, если firewall это разрешает.
 
 2. В веб-интерфейсе: `Actions` -> `Show ID`, это id сервера.
 
