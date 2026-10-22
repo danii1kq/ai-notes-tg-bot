@@ -5,6 +5,11 @@ the project follows [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+### Changed
+
+- The title of the file of the month is in the language of the owner now:
+  `October 2026` for the English user, `Октябрь 2026` for the Russian one.
+
 ## [0.2.1] - 2026-10-22
 
 The security review of the project: the findings are fixed and the boundaries
