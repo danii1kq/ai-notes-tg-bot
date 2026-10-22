@@ -39,34 +39,43 @@ export function validateInitData(
   const hash = params.get("hash");
   if (!hash) return { ok: false, error: "no hash in the init data" };
 
-  const pairs: string[] = [];
+  const pairs: Array<[string, string]> = [];
   for (const [key, value] of params.entries()) {
-    if (key === "hash" || key === "signature") continue;
-    pairs.push(`${key}=${value}`);
+    if (key === "hash") continue;
+    pairs.push([key, value]);
   }
-  pairs.sort();
 
-  const expected = createHmac("sha256", secretKey(botToken)).update(pairs.join("\n")).digest();
+  // The string of the check holds every field but the hash. Telegram adds a
+  // signature for the check by a third party, and different versions of the
+  // clients put it into the string or not, so both variants are tried.
+  const withSignature = [...pairs].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const withoutSignature = withSignature.filter(([key]) => key !== "signature");
+
   const given = Buffer.from(hash, "hex");
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
-    return { ok: false, error: "the signature of the init data does not match" };
+  for (const variant of [withoutSignature, withSignature]) {
+    const check = variant.map(([key, value]) => `${key}=${value}`).join("\n");
+    const expected = createHmac("sha256", secretKey(botToken)).update(check).digest();
+    if (given.length === expected.length && timingSafeEqual(given, expected)) {
+      const authDate = Number(params.get("auth_date") ?? "0");
+      if (!Number.isFinite(authDate) || authDate <= 0) {
+        return { ok: false, error: "no auth date in the init data" };
+      }
+      if (Date.now() / 1000 - authDate > maxAgeSeconds) {
+        return { ok: false, error: "the init data is too old" };
+      }
+      return { ok: true, user: readUser(params.get("user")) };
+    }
   }
 
-  const authDate = Number(params.get("auth_date") ?? "0");
-  if (!Number.isFinite(authDate) || authDate <= 0) {
-    return { ok: false, error: "no auth date in the init data" };
-  }
-  if (Date.now() / 1000 - authDate > maxAgeSeconds) {
-    return { ok: false, error: "the init data is too old" };
-  }
+  return { ok: false, error: "the signature of the init data does not match" };
+}
 
-  const user = params.get("user");
-  if (!user) return { ok: true };
-
+/** Reads the user of the Mini App. */
+function readUser(raw: string | null): TelegramUser | undefined {
+  if (!raw) return undefined;
   try {
-    const parsed = JSON.parse(user) as TelegramUser;
-    return { ok: true, user: parsed };
+    return JSON.parse(raw) as TelegramUser;
   } catch {
-    return { ok: true };
+    return undefined;
   }
 }

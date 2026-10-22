@@ -243,6 +243,7 @@ async function main(): Promise<void> {
     browserToken: config.miniApp.token,
     logger: logger.child("miniapp"),
     webRoot: config.miniApp.webRoot,
+    debugFile: config.miniApp.debugFile,
     summaries: async () => {
       const rows = await db
         .select()

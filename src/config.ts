@@ -53,6 +53,8 @@ const envSchema = z.object({
   MINI_APP_TOKEN: z.string().default(""),
   /** The folder with the built frontend. */
   WEB_ROOT: z.string().default("/app/web"),
+  /** The file for the data of Telegram that was not accepted, for the look. */
+  MINI_APP_DEBUG_FILE: z.string().default(""),
 
   // --- Misc ---------------------------------------------------------------
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
@@ -101,6 +103,7 @@ export type AppConfig = {
     url: string;
     token: string;
     webRoot: string;
+    debugFile: string;
   };
   logLevel: "debug" | "info" | "warn" | "error";
   botAck: string;
@@ -195,6 +198,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       url: raw.MINI_APP_URL,
       token: raw.MINI_APP_TOKEN,
       webRoot: raw.WEB_ROOT,
+      debugFile: raw.MINI_APP_DEBUG_FILE,
     },
     logLevel: raw.LOG_LEVEL,
     botAck: raw.BOT_ACK,

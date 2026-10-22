@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
 import type { Logger } from "../logger.js";
@@ -24,6 +24,8 @@ export interface MiniAppOptions {
   webRoot: string;
   /** The summaries of the days, they are shown at the top of the list. */
   summaries?: () => Promise<SummaryEntry[]>;
+  /** The file for the data that was not accepted, for the diagnostics. */
+  debugFile?: string;
 }
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -166,14 +168,38 @@ export function createMiniApp(options: MiniAppOptions) {
   function isAllowed(request: IncomingMessage, url: URL): boolean {
     const initData = request.headers["x-telegram-init-data"];
     if (typeof initData === "string" && initData.length > 0) {
-      return validateInitData(initData, botToken).ok;
+      const result = validateInitData(initData, botToken);
+      if (result.ok) return true;
+      logger.warn("the init data of telegram was not accepted", {
+        reason: result.error,
+        length: initData.length,
+        fields: [...new URLSearchParams(initData).keys()],
+      });
+      void saveDebug(initData);
+      return false;
     }
 
     const header = request.headers["x-auth-token"];
     const token = typeof header === "string" ? header : url.searchParams.get("token");
     if (token && browserToken && token === browserToken) return true;
 
+    logger.warn("a request to the mini app came without the data of telegram", {
+      path: url.pathname,
+    });
     return false;
+  }
+
+  /**
+   * Keeps the last rejected data of Telegram in a file, so the problem can be
+   * looked at. The file is only written when the path is set.
+   */
+  async function saveDebug(initData: string): Promise<void> {
+    if (!options.debugFile) return;
+    try {
+      await writeFile(options.debugFile, initData, { encoding: "utf8", mode: 0o600 });
+    } catch (error) {
+      logger.warn("could not write the debug file", { error: String(error) });
+    }
   }
 
   async function serveStatic(response: ServerResponse, pathname: string): Promise<void> {
