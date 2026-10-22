@@ -134,7 +134,7 @@ export async function runDailySummary(
     return null;
   }
 
-  const file = await writeSection(deps.vault, day, summary);
+  const file = await writeSection(deps.vault, day, summary, language);
   await deps.db.insert(dailySummaries).values({
     date: day,
     file,
@@ -327,13 +327,14 @@ export async function writeSection(
   vault: VaultOperations,
   day: string,
   summary: string,
+  language: Language = "ru",
 ): Promise<string> {
   const file = monthFileName(day);
   const section = `## ${day}\n\n${summary}`;
   const current = await vault.readFile(file).catch(() => null);
 
   if (!current) {
-    const header = `---\ndate: ${day.slice(0, 7)}-01\ntags: [journal, daily]\n---\n\n# ${monthTitle(day)}\n`;
+    const header = `---\ndate: ${day.slice(0, 7)}-01\ntags: [journal, daily]\n---\n\n# ${monthTitle(day, language)}\n`;
     await vault.writeNote(file, `${header}\n${section}`, { source: "agent", autoLink: false });
     return file;
   }

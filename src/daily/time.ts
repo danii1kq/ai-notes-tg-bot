@@ -62,11 +62,14 @@ export function monthFileName(day: string): string {
   return `${name}_${date.getUTCFullYear()}.md`;
 }
 
-/** The title of the file of a month, for example `Октябрь 2026`. */
-export function monthTitle(day: string): string {
+/** The title of the file of a month, for example `Октябрь 2026` or `October 2026`. */
+export function monthTitle(day: string, language: "en" | "ru" = "ru"): string {
   const [year, month] = day.split("-").map(Number);
   const date = new Date(Date.UTC(year ?? 1970, (month ?? 1) - 1, 1));
-  const name = new Intl.DateTimeFormat("ru-RU", { month: "long", timeZone: "UTC" }).format(date);
+  const name = new Intl.DateTimeFormat(language === "en" ? "en-US" : "ru-RU", {
+    month: "long",
+    timeZone: "UTC",
+  }).format(date);
   return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${date.getUTCFullYear()}`;
 }
 

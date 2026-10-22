@@ -65,6 +65,7 @@ describe("the time of the vault", () => {
 
   it("names the title of a month", () => {
     expect(monthTitle("2026-10-21")).toBe("Октябрь 2026");
+    expect(monthTitle("2026-10-21", "en")).toBe("October 2026");
   });
 
   it("knows the day before", () => {
@@ -127,6 +128,15 @@ describe("writeSection", () => {
     expect(content).toContain("# Октябрь 2026");
     expect(content).toContain("## 2026-10-21");
     expect(content).toContain("Первый день.");
+  });
+
+  it("writes the title in the language of the owner", async () => {
+    const { vaultPath, vault } = await makeWorld();
+    await writeSection(vault, "2026-10-21", "The first day.", "en");
+
+    const content = await readFile(path.join(vaultPath, "october_2026.md"), "utf8");
+    expect(content).toContain("# October 2026");
+    expect(content).toContain("The first day.");
   });
 
   it("adds the next day to the same file", async () => {

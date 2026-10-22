@@ -33,8 +33,8 @@ into the file of the month.
 - A file that comes with the message (a photo, a document, a video, a voice
   message) is saved into the `attachments` folder of the vault and embedded
   into the note as `![[2026-10-22_photo_abc.jpg]]`.
-- At midnight the agent writes a summary of the day into the file of the month,
-  and the summary comes to the chat as well.
+- At midnight the agent writes the summary of the day into the file of the
+  month, and the chat gets a short notice with a button to the Mini App.
 - The notes are a small web app inside Telegram: the button in the menu of the
   chat opens the list of the notes, the search and the reading of a note.
 
@@ -75,18 +75,20 @@ date: 2026-10-01
 tags: [journal, daily]
 ---
 
-# Октябрь 2026
+# October 2026
 
 ## 2026-10-21
 
-Заметка «Идеи для бизнеса»: мысль о кофе на районе.
-Заметка «Дневник»: запись о прогулке и о книге.
+Note "Business ideas": a thought about coffee in the neighbourhood.
+Note "Diary": an entry about a walk and a book.
 ```
 
-The summary tells what was written that day, note by note. Every day is a
-section of its own, a day without a note is simply missing in the file.
+The summary tells what was written that day, note by note. It is in the
+language of the owner: an English user gets English, a Russian user gets
+Russian. Every day is a section of its own, a day without a note is simply
+missing in the file.
 
-The chat only gets a short notice with a button to the Mini App, the whole
+The chat only gets a short notice with a button to the Mini App. The whole
 summary lives in the file of the month and in the Mini App, where it is shown
 at the top of the list of the notes. When the bot was down at midnight, the
 missing summaries are made after the restart.
@@ -331,12 +333,12 @@ node dist/selftest.js "an idea for a business"
 - Если в сообщении нужны факты (незнакомый термин, цены, новости, вопрос),
   агент сначала ищет в интернете через MCP-сервер DuckDuckGo и записывает
   найденное в заметку вместе со ссылкой на источник.
-- Бот отвечает одной короткой строкой: `Создал заметку "Идеи для бизнеса"`.
+- Бот отвечает одной короткой строкой: `Создал заметку «Идеи для бизнеса»`.
 - Файл, который пришёл вместе с сообщением (фото, документ, видео, голосовое),
   сохраняется в папку `attachments` хранилища и вставляется в заметку как
   `![[2026-10-22_photo_abc.jpg]]`.
-- В полночь агент пишет вывод за день в файл месяца, и этот вывод приходит
-  ещё и в чат.
+- В полночь агент пишет итог за день в файл месяца, а в чат приходит короткое
+  уведомление со ссылкой на мини-приложение.
 - Заметки доступны как маленькое веб-приложение внутри Telegram: кнопка в
   меню чата открывает список заметок, поиск и чтение заметки.
 
@@ -358,16 +360,16 @@ node dist/selftest.js "an idea for a business"
 | `/language ru` | переключает бота на русский, `/language en` на английский |
 
 Язык бота хранится в базе для каждого пользователя. Новый пользователь
-получает английский, владелец бота - русский. Мини-приложение тоже идёт на
+получает английский, владелец бота - русский. Мини-приложение работает на
 языке пользователя.
 
-Теги пишутся прямо в сообщении: `#идея #работа` попадают в поле `tags`
+Теги пиши прямо в сообщении: `#идея #работа` попадут в поле `tags`
 фронтматтера заметки рядом с `inbox` и `telegram`.
 
-### Итог дня
+### Итоги дня
 
-В полночь, по времени владельца, агент смотрит на заметки прошедшего дня и
-записывает вывод в файл месяца, например `october_2026.md`:
+В полночь по часовому поясу владельца агент смотрит на заметки прошедшего дня
+и записывает итог в файл месяца, например `october_2026.md`:
 
 ```markdown
 ---
@@ -383,13 +385,15 @@ tags: [journal, daily]
 Заметка «Дневник»: запись о прогулке и о книге.
 ```
 
-Итог пишет, что именно было записано за день, по заметкам. Каждый день -
-отдельный раздел, дня без заметок в файле просто нет.
+Итог перечисляет по заметкам, что именно было записано за день, и пишется на
+языке владельца: русскоязычный пользователь получает русский текст,
+англоязычный - английский. Каждый день - отдельный раздел, дня без заметок в
+файле просто нет.
 
-В чат приходит только короткое уведомление с кнопкой на мини-приложение, а
-сам итог лежит в файле месяца и в мини-приложении, где он показан сверху
-списка заметок. Если бот был выключен в полночь, недостающие итоги
-досчитываются после запуска.
+В чат приходит только короткое уведомление с кнопкой для перехода в
+мини-приложение, а сам итог хранится в файле месяца и в мини-приложении, где
+он показан сверху списка заметок. Если бот был выключен в полночь,
+недостающие итоги создаются после запуска.
 
 ### Почему заметки не теряются
 
@@ -475,7 +479,7 @@ tags: [journal, daily]
 
 Первая сборка ставит Hermes Agent и идёт долго, дальше используются кэшированные слои.
 
-Образ есть и в реестре, так что при деплое можно не собирать его заново:
+Образ есть и в реестре, так что при деплое его можно не собирать:
 
 ```bash
 docker pull ghcr.io/danii1kq/telegram-to-obsidian_ai-agent:latest
@@ -488,7 +492,7 @@ docker pull ghcr.io/danii1kq/telegram-to-obsidian_ai-agent:latest
 картинками. Приложение следует теме Telegram, поэтому в светлой и в тёмной
 теме выглядит одинаково хорошо.
 
-Данные никому не отдаются: мини-приложение присылает подписанные данные
+Данные не отдаются никому: мини-приложение присылает подписанные данные
 Telegram, а бэкенд проверяет их токеном бота. Вне Telegram подписанных данных
 нет, поэтому в адрес приложения добавляется токен владельца:
 
@@ -497,7 +501,7 @@ https://<your-host>/?token=<MINI_APP_TOKEN>
 ```
 
 Фронтенд лежит в `web/`, он собирается через Vite и раздаётся тем же
-процессом, который работает ботом.
+процессом, в котором работает бот.
 
 Telegram принимает для мини-приложения только https-ссылки, поэтому
 приложение публикуется через туннель Cloudflare. Скрипт `deploy/tunnel.sh`
@@ -521,7 +525,7 @@ npm install -g @danii1kq/vault-mcp
 OBSIDIAN_VAULT_PATH=/path/to/vault vault-mcp
 ```
 
-Описание пакета лежит в [packages/vault-mcp](packages/vault-mcp).
+Описание пакета смотри в [packages/vault-mcp](packages/vault-mcp).
 
 ### Syncthing и ноутбук
 
@@ -554,7 +558,7 @@ docker compose up -d --build
 ```
 
 Скрипт `deploy/deploy.sh` делает то же самое и откатывается на прошлый образ,
-если новый контейнер не стал здоровым.
+если новый контейнер не прошёл проверку.
 
 ### Локальная разработка
 
