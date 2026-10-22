@@ -67,13 +67,16 @@ export class HermesClient {
     options: HermesRunOptions = {},
   ): Promise<Omit<HermesRunResult, "model" | "usedFallback">> {
     const startedAt = Date.now();
+    // The prompt is the message of the owner. The null byte would break the
+    // start of the process, and it means nothing in a text.
+    const safePrompt = prompt.replace(/\0/g, "");
     // `hermes chat -q` runs one query in the working directory (the agent
     // workspace with the rules) and prints the final answer.
     const args = [
       "chat",
       "-Q",
       "-q",
-      prompt,
+      safePrompt,
       "--max-turns",
       String(this.options.maxTurns),
       "--yolo",

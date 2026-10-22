@@ -1,5 +1,6 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  exchangeToken,
   fetchConfig,
   fetchNote,
   fetchNotes,
@@ -84,6 +85,19 @@ export default function App() {
       })
       .catch(() => setBotUsername(""));
   }, [loadNotes]);
+
+  // The token of the owner is exchanged for a session and taken out of the
+  // address, so it does not stay in the history of the browser.
+  useEffect(() => {
+    const token = fileToken;
+    if (!token) return;
+    void exchangeToken(token).then((ok) => {
+      if (!ok) return;
+      const url = new URL(window.location.href);
+      url.searchParams.delete("token");
+      window.history.replaceState({}, "", url.toString());
+    });
+  }, []);
 
   // The search waits for a pause in the typing.
   useEffect(() => {

@@ -24,8 +24,22 @@ function signInitData(params: Record<string, string>, botToken = BOT_TOKEN): str
   return new URLSearchParams({ ...params, hash }).toString();
 }
 
-function fakeRequest(url: string, headers: Record<string, string> = {}): IncomingMessage {
-  return { url, headers, method: "GET" } as unknown as IncomingMessage;
+function fakeRequest(
+  url: string,
+  headers: Record<string, string> = {},
+  method = "GET",
+  body = "",
+): IncomingMessage {
+  return {
+    url,
+    headers,
+    method,
+    socket: {},
+    on: (event: string, callback: (...args: unknown[]) => void) => {
+      if (event === "data" && body) callback(Buffer.from(body));
+      if (event === "end") callback();
+    },
+  } as unknown as IncomingMessage;
 }
 
 function fakeResponse() {
@@ -142,6 +156,60 @@ describe("the static files of the mini app", () => {
     // frontend, so it is never given away.
     expect(response.statusCode).not.toBe(200);
     expect(response.body()).not.toContain("root:");
+  });
+});
+
+describe("the safety of the mini app", () => {
+  it("sets the security headers on every answer", async () => {
+    const { handle } = await makeMiniApp();
+    const response = fakeResponse();
+    await handle(fakeRequest("/"), response);
+
+    expect(response.headers["Content-Security-Policy"]).toContain("default-src 'self'");
+    expect(response.headers["X-Content-Type-Options"]).toBe("nosniff");
+    expect(response.headers["Referrer-Policy"]).toBe("no-referrer");
+  });
+
+  it("exchanges the token of the owner for a session", async () => {
+    const { handle } = await makeMiniApp();
+    const response = fakeResponse();
+    await handle(
+      fakeRequest("/api/session", {}, "POST", JSON.stringify({ token: "secret-token" })),
+      response,
+    );
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["Set-Cookie"]).toContain("vault_session=");
+    expect(response.headers["Set-Cookie"]).toContain("HttpOnly");
+    expect(response.headers["Set-Cookie"]).toContain("SameSite=Strict");
+  });
+
+  it("does not open a session with a wrong token", async () => {
+    const { handle } = await makeMiniApp();
+    const response = fakeResponse();
+    await handle(
+      fakeRequest("/api/session", {}, "POST", JSON.stringify({ token: "wrong" })),
+      response,
+    );
+    expect(response.statusCode).toBe(401);
+  });
+
+  it("never gives a file of the owner as a page", async () => {
+    const { handle, root } = await makeMiniApp();
+    await mkdir(path.join(root, "vault", "attachments"), { recursive: true });
+    await writeFile(
+      path.join(root, "vault", "attachments", "page.html"),
+      "<script>alert(1)</script>",
+      "utf8",
+    );
+
+    const response = fakeResponse();
+    await handle(fakeRequest("/api/file?path=attachments/page.html&token=secret-token"), response);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toBe("application/octet-stream");
+    expect(response.headers["content-disposition"]).toContain("attachment");
+    expect(response.headers["x-content-type-options"]).toBe("nosniff");
   });
 });
 

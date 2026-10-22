@@ -1,4 +1,4 @@
-﻿import { mkdir } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
 import { desc } from "drizzle-orm";
@@ -310,8 +310,12 @@ async function main(): Promise<void> {
   /** Takes the update of Telegram and gives it to the bot. */
   async function handleWebhook(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const secret = request.headers["x-telegram-bot-api-secret-token"];
-    if (config.telegram.webhookSecret && secret !== config.telegram.webhookSecret) {
-      logger.warn("a webhook call came with a wrong secret");
+    // The secret is checked always: the webhook is open to the internet, and
+    // without the check anybody could send updates as the owner.
+    const expected = config.telegram.webhookSecret;
+    const given = Array.isArray(secret) ? secret[0] : secret;
+    if (!expected || given !== expected) {
+      logger.warn("a webhook call came without the right secret");
       response.writeHead(403).end("forbidden");
       return;
     }

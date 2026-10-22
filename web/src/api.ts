@@ -81,3 +81,23 @@ export async function fetchConfig(): Promise<{ botUsername: string; language: La
   const payload = await request<{ botUsername: string; language: Language }>("/api/config");
   return payload;
 }
+
+/**
+ * Exchanges the token of the owner for a session.
+ *
+ * The token is in the address of the page, so it is given to the server once
+ * and taken out of the address: from then on the session cookie carries the
+ * access.
+ */
+export async function exchangeToken(token: string): Promise<boolean> {
+  try {
+    const response = await fetch("/api/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}

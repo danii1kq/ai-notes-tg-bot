@@ -4,8 +4,32 @@
  * The text of a note is never trusted, so everything is escaped before the
  * html is built. Only the marks of the notes are understood: the headings,
  * the lists, the quotes, the code, the links, the wiki links and the embeds
- * of the files.
+ * of the files. The result is cleaned once more, so a mark that is not
+ * understood can never become a script.
  */
+import DOMPurify from "dompurify";
+
+const ALLOWED_TAGS = [
+  "p",
+  "br",
+  "strong",
+  "em",
+  "code",
+  "pre",
+  "ul",
+  "ol",
+  "li",
+  "blockquote",
+  "h1",
+  "h2",
+  "h3",
+  "hr",
+  "a",
+  "img",
+  "span",
+];
+
+const ALLOWED_ATTR = ["href", "src", "alt", "class", "title"];
 
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic"];
 
@@ -62,6 +86,18 @@ function renderInline(text: string, fileToken: string): string {
 
 /** Turns the text of a note into html. */
 export function renderMarkdown(source: string, fileToken = ""): string {
+  const html = buildHtml(source, fileToken);
+  // The last line of defence: only the marks of a note survive.
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR,
+    ALLOW_DATA_ATTR: false,
+    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form"],
+    FORBID_ATTR: ["onerror", "onload", "onclick", "style", "formaction"],
+  });
+}
+
+function buildHtml(source: string, fileToken = ""): string {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
   const blocks: string[] = [];
   let paragraph: string[] = [];

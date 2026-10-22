@@ -170,6 +170,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("ALLOWED_TELEGRAM_ID must contain at least one Telegram user id");
   }
 
+  // The webhook is open to the internet, so the secret of Telegram is not
+  // optional there: without it anybody could send updates as the owner.
+  if (raw.TELEGRAM_MODE === "webhook") {
+    if (!raw.TELEGRAM_WEBHOOK_URL.startsWith("https://")) {
+      throw new Error("TELEGRAM_WEBHOOK_URL must be an https address in the webhook mode");
+    }
+    if (raw.TELEGRAM_WEBHOOK_SECRET.length < 16) {
+      throw new Error("TELEGRAM_WEBHOOK_SECRET must be at least 16 characters in the webhook mode");
+    }
+  }
+
   return {
     telegram: {
       botToken: raw.TELEGRAM_BOT_TOKEN,

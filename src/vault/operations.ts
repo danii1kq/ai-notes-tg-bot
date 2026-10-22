@@ -134,7 +134,9 @@ export class VaultOperations {
     file_glob?: string;
   }): Promise<SearchHit[]> {
     const target = params.target ?? "files";
-    const pattern = params.pattern?.trim() ?? "";
+    // The pattern can be a regular expression, so it is kept short: a long
+    // one can make the search slow.
+    const pattern = (params.pattern?.trim() ?? "").slice(0, 200);
     if (!pattern) return [];
 
     const root = params.path ? resolveInsideVault(this.vaultRoot, params.path) : this.vaultRoot;

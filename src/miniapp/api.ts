@@ -53,6 +53,35 @@ const CONTENT_TYPES: Record<string, string> = {
   ".map": "application/json; charset=utf-8",
 };
 
+/** The files of the owner that the app shows as a picture. */
+const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+
+/**
+ * The headers of every answer of the app.
+ *
+ * The content security policy keeps the scripts of the page to the app itself
+ * and to the SDK of Telegram. The referrer policy stops the address of the
+ * page (with the token of the owner in it) from travelling to other sites.
+ */
+const SECURITY_HEADERS: Record<string, string> = {
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "script-src 'self' https://telegram.org",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "connect-src 'self'",
+    "font-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org",
+  ].join("; "),
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "no-referrer",
+  "X-Frame-Options": "SAMEORIGIN",
+  "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+};
+
 /**
  * The Mini App of the notes.
  *
@@ -79,10 +108,21 @@ export function createMiniApp(options: MiniAppOptions) {
     request: IncomingMessage,
     response: ServerResponse,
   ): Promise<boolean> {
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      response.setHeader(name, value);
+    }
+
     const url = new URL(request.url ?? "/", "http://localhost");
     const pathname = url.pathname;
 
     if (pathname.startsWith("/api/")) {
+      // The token of the owner is exchanged for a session here, so this is
+      // the one endpoint that does not need the access.
+      if (pathname === "/api/session" && request.method === "POST") {
+        await handleSession(request, response);
+        return true;
+      }
+
       const auth = await authorize(request, url);
       if (!auth.ok) {
         logger.warn("a request to the mini app was not allowed", { path: pathname });
@@ -90,10 +130,7 @@ export function createMiniApp(options: MiniAppOptions) {
         return true;
       }
       if (auth.session) {
-        response.setHeader(
-          "Set-Cookie",
-          `${sessionCookie}=${auth.session}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400`,
-        );
+        response.setHeader("Set-Cookie", sessionCookieHeader(auth.session, isSecure(request)));
       }
       await handleApi(request, response, url, pathname);
       return true;
@@ -105,6 +142,53 @@ export function createMiniApp(options: MiniAppOptions) {
     await serveStatic(response, pathname);
     return true;
   };
+
+  /**
+   * Exchanges the token of the owner for a session.
+   *
+   * The token is in the address of the page, so it is given to the server
+   * once and taken out of the address: from then on the cookie carries the
+   * access.
+   */
+  async function handleSession(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    try {
+      const body = await readBody(request);
+      const token = parseToken(body);
+      if (!token || !browserToken || token !== browserToken) {
+        sendJson(response, 401, { ok: false, error: "not allowed" });
+        return;
+      }
+      const session = randomBytes(24).toString("hex");
+      sessions.set(session, Date.now() + sessionLifetime);
+      pruneSessions();
+      response.setHeader("Set-Cookie", sessionCookieHeader(session, isSecure(request)));
+      sendJson(response, 200, { ok: true });
+    } catch (error) {
+      logger.error("the session could not be opened", { error: String(error) });
+      sendJson(response, 400, { ok: false, error: "bad request" });
+    }
+  }
+
+  /** The cookie of the session, with the flags of a session cookie. */
+  function sessionCookieHeader(session: string, secure: boolean): string {
+    const parts = [
+      `${sessionCookie}=${session}`,
+      "Path=/",
+      "HttpOnly",
+      "SameSite=Strict",
+      "Max-Age=86400",
+    ];
+    if (secure) parts.push("Secure");
+    return parts.join("; ");
+  }
+
+  /** True when the request came over https, the tunnel sets the header. */
+  function isSecure(request: IncomingMessage): boolean {
+    const proto = request.headers["x-forwarded-proto"];
+    const value = Array.isArray(proto) ? proto[0] : proto;
+    const socket = request.socket as { encrypted?: boolean } | undefined;
+    return value === "https" || Boolean(socket?.encrypted);
+  }
 
   /**
    * Checks the request: the signed data of Telegram, the session of the
@@ -129,6 +213,7 @@ export function createMiniApp(options: MiniAppOptions) {
 
       const session = randomBytes(24).toString("hex");
       sessions.set(session, Date.now() + sessionLifetime);
+      pruneSessions();
       return { ok: true, userId: result.user?.id, session };
     }
 
@@ -152,6 +237,19 @@ export function createMiniApp(options: MiniAppOptions) {
       path: url.pathname,
     });
     return { ok: false };
+  }
+
+  /** Throws away the sessions that are over and keeps the list short. */
+  function pruneSessions(): void {
+    const now = Date.now();
+    for (const [session, expiry] of sessions) {
+      if (expiry <= now) sessions.delete(session);
+    }
+    while (sessions.size > 50) {
+      const oldest = sessions.keys().next();
+      if (oldest.done) break;
+      sessions.delete(oldest.value);
+    }
   }
 
   async function handleApi(
@@ -251,10 +349,19 @@ export function createMiniApp(options: MiniAppOptions) {
           sendJson(response, 404, { ok: false, error: "no file" });
           return;
         }
-        const type =
-          CONTENT_TYPES[path.extname(file.relativePath).toLowerCase()] ??
-          "application/octet-stream";
-        response.writeHead(200, { "content-type": type, "cache-control": "no-cache" });
+
+        // A file of the owner is never a page: only the pictures are shown as
+        // pictures, everything else comes as a download. Otherwise a file with
+        // the html inside would run in the origin of the app.
+        const guessed = CONTENT_TYPES[path.extname(file.relativePath).toLowerCase()];
+        const type = guessed && IMAGE_TYPES.has(guessed) ? guessed : "application/octet-stream";
+        const disposition = type === "application/octet-stream" ? "attachment" : "inline";
+        response.writeHead(200, {
+          "content-type": type,
+          "content-disposition": `${disposition}; filename="${encodeURIComponent(path.basename(file.relativePath))}"`,
+          "x-content-type-options": "nosniff",
+          "cache-control": "private, max-age=300",
+        });
         response.end(Buffer.from(file.data));
         return;
       }
@@ -342,6 +449,36 @@ function sendJson(response: ServerResponse, status: number, payload: unknown): v
     "cache-control": "no-store",
   });
   response.end(body);
+}
+
+/** The body of a request, with a limit so a big body cannot fill the memory. */
+async function readBody(request: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+
+  return new Promise((resolve, reject) => {
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > 4096) {
+        reject(new Error("the body is too big"));
+        request.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    request.on("error", reject);
+  });
+}
+
+/** The token of the owner from the body of the request. */
+function parseToken(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as { token?: unknown };
+    return typeof parsed.token === "string" ? parsed.token : null;
+  } catch {
+    return null;
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {

@@ -76,7 +76,11 @@ services:
       - ${VAULT_HOST_PATH:-/opt/obsidian-vault}:/vault
       - syncthing-config:/config
     ports:
-      - "8384:8384" # web interface
+      # The web interface of Syncthing is only reachable from the server
+      # itself, the owner reaches it through an ssh tunnel. The port of the
+      # synchronisation stays open, it is protected by the keys of the
+      # devices.
+      - "127.0.0.1:8384:8384"
       - "22000:22000/tcp" # sync
       - "21027:21027/udp" # discovery
     logging:

@@ -1,4 +1,4 @@
-﻿import { and, count, desc, eq, isNull } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import type { Database } from "../db/index.js";
 import { dailySummaries, notesLog, undoLog } from "../db/schema.js";
 import { type Language, messages } from "../i18n/index.js";
