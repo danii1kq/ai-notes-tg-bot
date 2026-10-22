@@ -69,7 +69,10 @@ describe("the webhook", () => {
 });
 
 /** Writes one line of the log and gives it back. */
-function capture(logger: ReturnType<typeof createLogger>, context: Record<string, unknown>): string {
+function capture(
+  logger: ReturnType<typeof createLogger>,
+  context: Record<string, unknown>,
+): string {
   const original = process.stdout.write.bind(process.stdout);
   let line = "";
   process.stdout.write = ((chunk: string | Uint8Array) => {
