@@ -21,7 +21,7 @@
   --text-muted: color-mix(in srgb, var(--text-base) 66%, transparent);
   --text-faint: color-mix(in srgb, var(--text-base) 48%, transparent);
   --accent: var(--tg-theme-link-color, #2f7cf6);
-  --accent-text: var(--tg-theme-accent-text-color, var(--tg-theme-link-color, #2f7cf6));
+  --accent-text: var(--tg-theme-accent-text-color, var(--tg-theme-link-color, #1f6fd0));
   --danger: var(--tg-theme-destructive-text-color, #e5484d);
   --border: var(--tg-theme-section-separator-color, rgba(17, 17, 17, 0.14));
   --fill: color-mix(in srgb, var(--text-base) 8%, transparent);
@@ -54,6 +54,7 @@
     --surface: var(--tg-theme-bg-color, #0d0d10);
     --surface-raised: var(--tg-theme-section-bg-color, #1a1a1f);
     --surface-sunken: var(--tg-theme-secondary-bg-color, #24242a);
+    --accent-text: var(--tg-theme-accent-text-color, var(--tg-theme-link-color, #64b5f6));
     --border: var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.14));
   }
 }
