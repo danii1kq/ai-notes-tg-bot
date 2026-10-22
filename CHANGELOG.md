@@ -5,6 +5,34 @@ the project follows [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-22
+
+The security review of the project: the findings are fixed and the boundaries
+of the bot and of the Mini App are written down in SECURITY.md.
+
+### Security
+
+- The text of a note is cleaned with DOMPurify before it becomes the page of
+  the Mini App. Only the marks of a note are allowed there.
+- A file of the owner is never a page: only the pictures are shown as
+  pictures, everything else comes as a download with `nosniff`.
+- The webhook of the bot needs the secret of Telegram now, the application does
+  not start without it.
+- The web interface of Syncthing is not open to the internet any more, the
+  owner reaches it through an ssh tunnel.
+- Every answer of the Mini App carries the security headers: the policy of
+  the content, `nosniff`, the referrer policy and the policy of the
+  permissions.
+- The token of the owner is exchanged for a session and taken out of the
+  address of the page. The cookie of the session has the flag `Secure` over
+  https, it is over after a day and there are at most fifty of them.
+- The logger hides the token of the bot, the key of the model, the header of
+  the authorization and the token in an address.
+- The search pattern of the vault is cut at 200 characters, so a slow
+  expression cannot take the process down.
+- The null bytes are cut out of the prompt of the agent, they broke the start
+  of the process.
+
 ## [0.2.0] - 2026-10-22
 
 The second release: the notes get their own web app inside Telegram, the bot
@@ -59,6 +87,7 @@ speaks two languages and the day ends with a summary of what was written.
 - The text of the Mini App follows the theme in the dark mode too, the muted
   text was black there.
 
-[Unreleased]: https://github.com/danii1kq/telegram-to-obsidian_ai-agent/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/danii1kq/telegram-to-obsidian_ai-agent/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/danii1kq/telegram-to-obsidian_ai-agent/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/danii1kq/telegram-to-obsidian_ai-agent/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/danii1kq/telegram-to-obsidian_ai-agent/releases/tag/v0.1.0
