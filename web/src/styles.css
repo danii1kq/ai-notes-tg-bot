@@ -22,6 +22,8 @@
   --text-faint: color-mix(in srgb, var(--text-base) 48%, transparent);
   --accent: var(--tg-theme-link-color, #2f7cf6);
   --accent-text: var(--tg-theme-accent-text-color, var(--tg-theme-link-color, #1f6fd0));
+  /* The accent for the text on a tinted surface, it keeps the contrast. */
+  --accent-strong: var(--tg-theme-accent-text-color, #14538f);
   --danger: var(--tg-theme-destructive-text-color, #e5484d);
   --border: var(--tg-theme-section-separator-color, rgba(17, 17, 17, 0.14));
   --fill: color-mix(in srgb, var(--text-base) 8%, transparent);
@@ -55,6 +57,7 @@
     --surface-raised: var(--tg-theme-section-bg-color, #1a1a1f);
     --surface-sunken: var(--tg-theme-secondary-bg-color, #24242a);
     --accent-text: var(--tg-theme-accent-text-color, var(--tg-theme-link-color, #64b5f6));
+    --accent-strong: var(--tg-theme-accent-text-color, #8ec8f8);
     --border: var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.14));
   }
 }
@@ -250,6 +253,7 @@ button {
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.35;
+  color: var(--text);
 }
 
 .card-meta {
@@ -284,7 +288,7 @@ button {
   padding: 1px 8px;
   border-radius: var(--radius-chip);
   background: var(--accent-fill);
-  color: var(--accent-text);
+  color: var(--accent-strong);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
@@ -298,7 +302,7 @@ button {
 
 .card-summary .card-icon,
 .card-summary .card-title {
-  color: var(--accent-text);
+  color: var(--accent-strong);
 }
 
 /* --- The note -------------------------------------------------------------- */
