@@ -53,6 +53,12 @@ user id is dropped without an answer.
 | `/undo confirm` | deletes a created note that was changed after the bot wrote it |
 | `/summary` | makes the summary of yesterday right now |
 | `/summary 2026-10-20` | makes the summary of that day |
+| `/language` | shows the two languages of the bot |
+| `/language ru` | switches the bot to Russian, `/language en` to English |
+
+The language of the bot is kept per user in the database. A new user gets
+English, the owner of the bot gets Russian. The Mini App follows the language
+of the user too.
 
 Tags are written in the message itself: `#idea #work` end up in the
 `tags` field of the frontmatter of the note, next to `inbox` and `telegram`.
@@ -152,6 +158,8 @@ Requirements: a Linux server with Docker and Docker Compose.
    | `HERMES_FALLBACK_MODEL` | model used when the first one fails |
    | `MINI_APP_URL` | the public https address of the Mini App, for the menu button |
    | `MINI_APP_TOKEN` | the token for the browser, the address of the app carries it |
+   | `DEFAULT_LANGUAGE` | the language of a user that never chose one, `en` by default |
+   | `OWNER_LANGUAGE` | the language of the owner of the bot, `ru` by default |
    | `PUID` / `PGID` | owner of the notes, `1000` by default |
 
 3. Prepare the vault folder and build the containers:
@@ -347,6 +355,12 @@ node dist/selftest.js "an idea for a business"
 | `/undo confirm` | удаляет созданную заметку, которую меняли после записи бота |
 | `/summary` | делает итог за вчера прямо сейчас |
 | `/summary 2026-10-20` | делает итог за этот день |
+| `/language` | показывает два языка бота |
+| `/language ru` | переключает бота на русский, `/language en` на английский |
+
+Язык бота хранится в базе для каждого пользователя. Новый пользователь
+получает английский, владелец бота - русский. Мини-приложение тоже идёт на
+языке пользователя.
 
 Теги пишутся прямо в сообщении: `#идея #работа` попадают в поле `tags`
 фронтматтера заметки рядом с `inbox` и `telegram`.
@@ -441,6 +455,8 @@ tags: [journal, daily]
    | `HERMES_FALLBACK_MODEL` | резервная модель, если основная не ответила |
    | `MINI_APP_URL` | публичный https-адрес мини-приложения, для кнопки в меню |
    | `MINI_APP_TOKEN` | токен для браузера, он едет в адресе приложения |
+   | `DEFAULT_LANGUAGE` | язык пользователя, который не выбирал, по умолчанию `en` |
+   | `OWNER_LANGUAGE` | язык владельца бота, по умолчанию `ru` |
    | `PUID` / `PGID` | владелец файлов заметок, по умолчанию `1000` |
 
 3. Готовим папку хранилища и собираем контейнеры:

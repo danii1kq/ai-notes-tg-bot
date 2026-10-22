@@ -39,6 +39,12 @@ const envSchema = z.object({
   LLM_API_KEY: z.string().default(""),
   LLM_SESSION_ID: z.string().default(""),
 
+  // --- Language -----------------------------------------------------------
+  /** The language of a user that never chose one. */
+  DEFAULT_LANGUAGE: z.enum(["en", "ru"]).default("en"),
+  /** The language of the owner of the bot. */
+  OWNER_LANGUAGE: z.enum(["en", "ru"]).default("ru"),
+
   // --- Local state --------------------------------------------------------
   DB_PATH: z.string().default("/app/data/app.db"),
   VAULT_EVENTS_FILE: z.string().default("/app/data/vault-events.json"),
@@ -98,6 +104,10 @@ export type AppConfig = {
   };
   db: {
     path: string;
+  };
+  language: {
+    default: "en" | "ru";
+    owner: "en" | "ru";
   };
   miniApp: {
     url: string;
@@ -193,6 +203,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     },
     db: {
       path: raw.DB_PATH,
+    },
+    language: {
+      default: raw.DEFAULT_LANGUAGE,
+      owner: raw.OWNER_LANGUAGE,
     },
     miniApp: {
       url: raw.MINI_APP_URL,

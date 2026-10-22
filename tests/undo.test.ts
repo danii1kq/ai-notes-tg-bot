@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+﻿import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -36,10 +36,10 @@ describe("searchNotes", () => {
     await vault.writeNote("Business.md", "coffee and products");
 
     const deps = { vault, db, logger };
-    const byName = await searchNotes("health", deps);
+    const byName = await searchNotes("health", deps, "ru");
     expect(byName).toContain("Health.md");
 
-    const byText = await searchNotes("running", deps);
+    const byText = await searchNotes("running", deps, "ru");
     expect(byText).toContain("Health.md");
 
     client.close();
@@ -47,7 +47,7 @@ describe("searchNotes", () => {
 
   it("says that nothing was found", async () => {
     const { vault, db, client } = await makeWorld();
-    const result = await searchNotes("nothing here", { vault, db, logger });
+    const result = await searchNotes("nothing here", { vault, db, logger }, "ru");
     expect(result).toContain("Ничего не нашлось");
     client.close();
   });
@@ -59,7 +59,7 @@ describe("listInbox", () => {
     await vault.writeNote("Ideas.md", "an idea");
     await vault.writeNote("Health.md", "running");
 
-    const result = await listInbox({ vault, db, logger });
+    const result = await listInbox({ vault, db, logger }, "ru");
     expect(result).toContain("Ideas.md");
     expect(result).toContain("Health.md");
     client.close();
@@ -84,7 +84,7 @@ describe("undoLast", () => {
       telegramUserId: "1",
     });
 
-    const result = await undoLast({ vault, db, logger }, 1);
+    const result = await undoLast({ vault, db, logger }, 1, "ru");
     expect(result).toContain("Убрал свою запись");
 
     const content = await readFile(path.join(root, "vault", "Diary.md"), "utf8");
@@ -105,7 +105,7 @@ describe("undoLast", () => {
       telegramUserId: "1",
     });
 
-    const result = await undoLast({ vault, db, logger }, 1);
+    const result = await undoLast({ vault, db, logger }, 1, "ru");
     expect(result).toContain("Удалил заметку");
 
     await expect(readFile(path.join(root, "vault", "Ideas.md"), "utf8")).rejects.toThrow();
@@ -127,17 +127,17 @@ describe("undoLast", () => {
     // Somebody edited the note after the bot created it.
     await writeFile(path.join(root, "vault", "Ideas.md"), "an idea, edited by hand", "utf8");
 
-    const question = await undoLast({ vault, db, logger }, 1);
+    const question = await undoLast({ vault, db, logger }, 1, "ru");
     expect(question).toContain("Ответь /undo confirm");
 
-    const confirmed = await undoLast({ vault, db, logger }, 1, true);
+    const confirmed = await undoLast({ vault, db, logger }, 1, "ru", true);
     expect(confirmed).toContain("Удалил заметку");
     client.close();
   });
 
   it("says that there is nothing to undo", async () => {
     const { vault, db, client } = await makeWorld();
-    const result = await undoLast({ vault, db, logger }, 1);
+    const result = await undoLast({ vault, db, logger }, 1, "ru");
     expect(result).toContain("Отменять нечего");
     client.close();
   });

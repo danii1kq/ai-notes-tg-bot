@@ -1,6 +1,7 @@
-import { and, count, desc, eq, isNull } from "drizzle-orm";
+﻿import { and, count, desc, eq, isNull } from "drizzle-orm";
 import type { Database } from "../db/index.js";
 import { dailySummaries, notesLog, undoLog } from "../db/schema.js";
+import { type Language, messages } from "../i18n/index.js";
 import type { Logger } from "../logger.js";
 import type { VaultOperations } from "../vault/operations.js";
 
@@ -30,9 +31,13 @@ const pendingDeletes = new Map<string, { path: string; title: string }>();
 const MAX_RESULTS = 12;
 
 /** Searches the vault by the name of a note and by the text inside the notes. */
-export async function searchNotes(query: string, deps: ActionDeps): Promise<string> {
+export async function searchNotes(
+  query: string,
+  deps: ActionDeps,
+  language: Language,
+): Promise<string> {
   const trimmed = query.trim();
-  if (!trimmed) return "Напиши запрос: /search кофе";
+  if (!trimmed) return messages(language).searchUsage;
 
   const byName = await deps.vault.searchFiles({ target: "files", pattern: trimmed });
   const byContent = await deps.vault.searchFiles({ target: "content", pattern: trimmed });
@@ -53,19 +58,19 @@ export async function searchNotes(query: string, deps: ActionDeps): Promise<stri
     if (hit.snippet) lines.push(`  ${hit.snippet}`);
   }
 
-  if (lines.length === 0) return `Ничего не нашлось по запросу «${trimmed}».`;
+  if (lines.length === 0) return messages(language).searchNotFound(trimmed);
   const shown = lines.slice(0, MAX_RESULTS);
   const hidden = lines.length - shown.length;
-  const tail = hidden > 0 ? `\nи ещё ${hidden}` : "";
-  return `🔎 По запросу «${trimmed}»:\n${shown.join("\n")}${tail}`;
+  const tail = hidden > 0 ? `\n${messages(language).searchMore(hidden)}` : "";
+  return `${messages(language).searchHeader(trimmed)}\n${shown.join("\n")}${tail}`;
 }
 
 /** Lists the notes that are still in the inbox. */
-export async function listInbox(deps: ActionDeps): Promise<string> {
+export async function listInbox(deps: ActionDeps, language: Language): Promise<string> {
   const notes = await deps.vault.listByTag("inbox");
-  if (notes.length === 0) return "📥 В инбоксе пусто.";
+  if (notes.length === 0) return messages(language).inboxEmpty;
   const lines = notes.slice(0, MAX_RESULTS).map((note) => `• ${note.title} - ${note.relativePath}`);
-  return `📥 В инбоксе (${notes.length}):\n${lines.join("\n")}`;
+  return `${messages(language).inboxHeader(notes.length)}\n${lines.join("\n")}`;
 }
 
 /**
@@ -78,6 +83,7 @@ export async function listInbox(deps: ActionDeps): Promise<string> {
 export async function undoLast(
   deps: ActionDeps,
   userId: number,
+  language: Language,
   confirmed = false,
 ): Promise<string> {
   const rows = await deps.db
@@ -88,25 +94,25 @@ export async function undoLast(
     .limit(1);
 
   const entry = rows[0];
-  if (!entry) return "↩️ Отменять нечего: последних записей я не делал.";
+  if (!entry) return messages(language).undoNothing;
 
   const pending = pendingDeletes.get(String(userId));
 
   if (entry.action === "append") {
-    if (!entry.block) return "↩️ Не помню, что именно дописал. Запись осталась как есть.";
+    if (!entry.block) return messages(language).undoNothing;
     const result = await deps.vault.removeBlock(entry.path, entry.block);
     if (!result.removed) {
-      return `↩️ В заметке «${entry.title}» не нашлось моей записи, ничего не менял.`;
+      return messages(language).undoNotFound(entry.title);
     }
     await markUndone(deps, entry.id);
-    return `↩️ Убрал свою запись из «${entry.title}».`;
+    return messages(language).undoRemoved(entry.title);
   }
 
   if (entry.action === "overwrite") {
-    if (!entry.previous) return "↩️ Не помню прежнее содержимое заметки.";
+    if (!entry.previous) return messages(language).undoNothing;
     await deps.vault.writeNote(entry.path, entry.previous, { source: "agent", autoLink: false });
     await markUndone(deps, entry.id);
-    return `↩️ Вернул прежнее содержимое заметки «${entry.title}».`;
+    return messages(language).undoRestored(entry.title);
   }
 
   // The note was created by the bot. It is only deleted when nobody touched
@@ -115,17 +121,17 @@ export async function undoLast(
     const changed = await wasChangedAfter(entry.path, entry.createdAt, deps);
     if (changed) {
       pendingDeletes.set(String(userId), { path: entry.path, title: entry.title });
-      return `⚠️ Заметку «${entry.title}» меняли после того, как я её создал. Удалить всё равно? Ответь /undo confirm.`;
+      return messages(language).undoConfirm(entry.title);
     }
   } else if (!pending || pending.path !== entry.path) {
-    return "↩️ Нечего подтверждать.";
+    return messages(language).undoNothingToConfirm;
   }
 
   pendingDeletes.delete(String(userId));
   const result = await deps.vault.deleteNote(entry.path);
-  if (!result.removed) return `↩️ Заметки «${entry.title}» уже нет.`;
+  if (!result.removed) return messages(language).undoNotFound(entry.title);
   await markUndone(deps, entry.id);
-  return `↩️ Удалил заметку «${entry.title}».`;
+  return messages(language).undoDeleted(entry.title);
 }
 
 /** Marks the entry of the log as undone. */
@@ -139,7 +145,7 @@ async function markUndone(deps: ActionDeps, id: number): Promise<void> {
  * The state of the bot: the model, the notes, the queue and the last summary
  * of the day.
  */
-export async function buildStatus(deps: StatusDeps): Promise<string> {
+export async function buildStatus(deps: StatusDeps, language: Language): Promise<string> {
   const total = await deps.db.select({ value: count() }).from(notesLog);
   const notes = await deps.db.select().from(notesLog).orderBy(desc(notesLog.id)).limit(5);
   const summaries = await deps.db
@@ -152,16 +158,16 @@ export async function buildStatus(deps: StatusDeps): Promise<string> {
   const bytes = vaultNotes.reduce((sum, note) => sum + note.size, 0);
 
   const lines = [
-    `📊 Бот работает ${uptime(deps.uptimeMs)}`,
-    `• Модель: ${deps.model}${deps.fallbackModel ? ` (резерв ${deps.fallbackModel})` : ""}`,
-    `• Заметок: ${total[0]?.value ?? 0} (в хранилище ${vaultNotes.length}, ${formatBytes(bytes)})`,
-    `• В очереди: ${deps.queueSize}`,
-    `• Последний итог: ${summaries[0]?.date ?? "ещё нет"}`,
-    `• Время: ${deps.now}`,
+    messages(language).statusRunning(uptime(deps.uptimeMs)),
+    messages(language).statusModel(deps.model, deps.fallbackModel),
+    messages(language).statusNotes(total[0]?.value ?? 0, vaultNotes.length, formatBytes(bytes)),
+    messages(language).statusQueue(deps.queueSize),
+    messages(language).statusSummary(summaries[0]?.date ?? "-"),
+    messages(language).statusTime(deps.now),
   ];
 
   if (notes.length > 0) {
-    lines.push("", "Последние записи:");
+    lines.push("", messages(language).statusHeader);
     for (const note of notes) lines.push(`• ${note.title} (${note.action})`);
   }
   return lines.join("\n");

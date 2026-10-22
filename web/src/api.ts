@@ -27,6 +27,8 @@ export interface SummaryEntry {
   file: string;
 }
 
+import type { Language } from "./texts";
+
 /** The token of the owner, when the app is opened in a browser. */
 export const fileToken = new URLSearchParams(window.location.search).get("token") ?? "";
 
@@ -74,8 +76,8 @@ export async function fetchSummaries(): Promise<SummaryEntry[]> {
   return payload.summaries;
 }
 
-/** The settings of the app, the name of the bot. */
-export async function fetchConfig(): Promise<{ botUsername: string }> {
-  const payload = await request<{ botUsername: string }>("/api/config");
+/** The settings of the app, the name of the bot and the language. */
+export async function fetchConfig(): Promise<{ botUsername: string; language: Language }> {
+  const payload = await request<{ botUsername: string; language: Language }>("/api/config");
   return payload;
 }

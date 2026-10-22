@@ -50,4 +50,14 @@ export const dailySummaries = sqliteTable("daily_summaries", {
   createdAt: text("created_at").notNull(),
 });
 
-export const schema = { notesLog, processedUpdates, undoLog, dailySummaries };
+/**
+ * The settings of every user of the bot, the language for now.
+ */
+export const userSettings = sqliteTable("user_settings", {
+  telegramUserId: text("telegram_user_id").primaryKey(),
+  language: text("language").notNull().default("en"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const schema = { notesLog, processedUpdates, undoLog, dailySummaries, userSettings };

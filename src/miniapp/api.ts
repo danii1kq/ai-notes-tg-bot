@@ -1,6 +1,7 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import path from "node:path";
+import type { Language } from "../i18n/index.js";
 import type { Logger } from "../logger.js";
 import type { VaultOperations } from "../vault/operations.js";
 import { validateInitData } from "./auth.js";
@@ -28,6 +29,12 @@ export interface MiniAppOptions {
   debugFile?: string;
   /** The name of the bot, for the button that opens the chat with it. */
   botUsername?: () => string;
+  /** The language of a user, for the texts of the app. */
+  language?: (userId: number) => Promise<Language>;
+  /** The language of the app when there is no user behind the request. */
+  defaultLanguage?: Language;
+  /** The id of the owner, for the requests from the browser. */
+  ownerId?: number;
 }
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -88,7 +95,15 @@ export function createMiniApp(options: MiniAppOptions) {
 
     try {
       if (pathname === "/api/config") {
-        sendJson(response, 200, { ok: true, botUsername: options.botUsername?.() ?? "" });
+        const userId = await currentUserId(request, url);
+        const language = userId
+          ? ((await options.language?.(userId)) ?? options.defaultLanguage ?? "en")
+          : (options.defaultLanguage ?? "en");
+        sendJson(response, 200, {
+          ok: true,
+          botUsername: options.botUsername?.() ?? "",
+          language,
+        });
         return;
       }
 
@@ -169,6 +184,23 @@ export function createMiniApp(options: MiniAppOptions) {
       logger.error("the mini app api failed", { path: pathname, error: String(error) });
       sendJson(response, 500, { ok: false, error: "the server could not answer" });
     }
+  }
+
+  /**
+   * The user behind the request: the signed data of Telegram carries the id,
+   * the browser of the owner is the owner itself.
+   */
+  async function currentUserId(request: IncomingMessage, url: URL): Promise<number | undefined> {
+    const initData = request.headers["x-telegram-init-data"];
+    if (typeof initData === "string" && initData.length > 0) {
+      const result = validateInitData(initData, botToken);
+      return result.ok ? result.user?.id : undefined;
+    }
+
+    const header = request.headers["x-auth-token"];
+    const token = typeof header === "string" ? header : url.searchParams.get("token");
+    if (token && browserToken && token === browserToken) return options.ownerId;
+    return undefined;
   }
 
   /** The signed data of Telegram or the token of the owner. */

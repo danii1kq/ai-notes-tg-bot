@@ -18,11 +18,13 @@ import { localDate, previousDay } from "./daily/time.js";
 import { createDatabase } from "./db/index.js";
 import { dailySummaries, notesLog, undoLog } from "./db/schema.js";
 import { HermesClient } from "./hermes/client.js";
+import { type Language, messages } from "./i18n/index.js";
 import { createLlmProxy } from "./llm/proxy.js";
 import { createLogger, type Logger } from "./logger.js";
 import { createMiniApp } from "./miniapp/api.js";
 import { setMenuButton } from "./miniapp/menu.js";
 import { type ProcessResult, processMessage } from "./pipeline.js";
+import { resolveLanguage, saveLanguage } from "./settings/language.js";
 import { saveAttachment } from "./vault/attachments.js";
 import { VaultGuard } from "./vault/guard.js";
 import { VaultOperations } from "./vault/operations.js";
@@ -100,6 +102,20 @@ async function main(): Promise<void> {
   /** The chat of the owner, the bot writes there. */
   const ownerChatId = [...config.telegram.allowedUserIds][0] ?? 0;
 
+  /** The language of every user, kept in the database. */
+  const languageStore = {
+    db,
+    options: {
+      defaultLanguage: config.language.default,
+      ownerLanguage: config.language.owner,
+      ownerIds: config.telegram.allowedUserIds,
+    },
+  };
+
+  const getLanguage = (userId: number): Promise<Language> => resolveLanguage(languageStore, userId);
+  const setLanguage = (userId: number, language: Language): Promise<void> =>
+    saveLanguage(languageStore, userId, language);
+
   /** Writes the result of the pipeline into the log of the notes and of the undo. */
   const record = async (result: ProcessResult, userId: number): Promise<void> => {
     await db.insert(notesLog).values({
@@ -126,29 +142,29 @@ async function main(): Promise<void> {
   const bot: Bot = createBot({
     config,
     logger: logger.child("telegram"),
-    onText: async (text, userId, chatId) => {
+    getLanguage,
+    setLanguage,
+    onText: async (text, userId, chatId, language) => {
       queue.push(async () => {
         if (config.botAck) {
           await bot.api.sendMessage(chatId, config.botAck).catch(() => undefined);
         }
         try {
-          const result = await processMessage(text, userId, {
-            config,
-            hermes,
-            vault,
-            logger: logger.child("pipeline"),
-          });
+          const result = await processMessage(
+            text,
+            userId,
+            { config, hermes, vault, logger: logger.child("pipeline") },
+            { language },
+          );
           await bot.api.sendMessage(chatId, result.status);
           await record(result, userId);
         } catch (error) {
           logger.error("could not process the message", { error: String(error) });
-          await bot.api
-            .sendMessage(chatId, "⚠️ Не смог записать заметку, попробуй ещё раз.")
-            .catch(() => undefined);
+          await bot.api.sendMessage(chatId, messages(language).errorWrite).catch(() => undefined);
         }
       });
     },
-    onAttachment: async ({ caption, file, userId, chatId }) => {
+    onAttachment: async ({ caption, file, userId, chatId, language }) => {
       queue.push(async () => {
         try {
           const saved = await saveAttachment(
@@ -167,54 +183,56 @@ async function main(): Promise<void> {
             text,
             userId,
             { config, hermes, vault, logger: logger.child("pipeline") },
-            { attachment: saved },
+            { attachment: saved, language },
           );
           await bot.api.sendMessage(chatId, result.status);
           await record(result, userId);
         } catch (error) {
           logger.error("could not save the file", { error: String(error) });
-          await bot.api
-            .sendMessage(chatId, "⚠️ Не смог сохранить файл, попробуй ещё раз.")
-            .catch(() => undefined);
+          await bot.api.sendMessage(chatId, messages(language).errorSave).catch(() => undefined);
         }
       });
     },
-    onStatus: async () =>
-      buildStatus({
-        vault,
-        db,
-        model: config.hermes.model,
-        fallbackModel: config.hermes.fallbackModel,
-        queueSize: queue.size,
-        uptimeMs: Date.now() - startedAt,
-        now: vault.currentDateTime(),
-      }),
-    onSearch: async (query, _userId) =>
-      searchNotes(query, { vault, db, logger: logger.child("actions") }),
-    onUndo: async (userId, confirmed) =>
-      undoLast({ vault, db, logger: logger.child("actions") }, userId, confirmed),
-    onInbox: async () => listInbox({ vault, db, logger: logger.child("actions") }),
-    onSummary: async (day, userId) => {
+    onStatus: async (_userId, language) =>
+      buildStatus(
+        {
+          vault,
+          db,
+          model: config.hermes.model,
+          fallbackModel: config.hermes.fallbackModel,
+          queueSize: queue.size,
+          uptimeMs: Date.now() - startedAt,
+          now: vault.currentDateTime(),
+        },
+        language,
+      ),
+    onSearch: async (query, _userId, language) =>
+      searchNotes(query, { vault, db, logger: logger.child("actions") }, language),
+    onUndo: async (userId, confirmed, language) =>
+      undoLast({ vault, db, logger: logger.child("actions") }, userId, language, confirmed),
+    onInbox: async (_userId, language) =>
+      listInbox({ vault, db, logger: logger.child("actions") }, language),
+    onSummary: async (day, userId, language) => {
       const requested = /^\d{4}-\d{2}-\d{2}$/.test(day)
         ? day
         : previousDay(localDate(new Date(), config.vault.timeZone));
       const chatId = userId;
 
       void queue.push(async () => {
-        const summary = await runDailySummary(dailyDeps, requested);
+        const summary = await runDailySummary(dailyDeps, requested, language);
         if (!summary) {
           await bot.api
-            .sendMessage(chatId, `📅 За ${requested} заметок не было, итог не записываю.`)
+            .sendMessage(chatId, messages(language).summaryEmpty(requested))
             .catch(() => undefined);
           return;
         }
-        const notice = summaryNotice(summary.day, config.miniApp.url);
+        const notice = summaryNotice(summary.day, config.miniApp.url, language);
         await bot.api
           .sendMessage(chatId, notice.text, summaryMarkup(notice))
           .catch(() => undefined);
       });
 
-      return `📅 Считаю итог за ${requested}...`;
+      return messages(language).summaryWorking(requested);
     },
   });
 
@@ -223,9 +241,10 @@ async function main(): Promise<void> {
     logger: logger.child("daily"),
     run: async (day) => {
       await queue.push(async () => {
-        const summary = await runDailySummary(dailyDeps, day);
+        const language = await getLanguage(ownerChatId);
+        const summary = await runDailySummary(dailyDeps, day, language);
         if (!summary) return;
-        const notice = summaryNotice(summary.day, config.miniApp.url);
+        const notice = summaryNotice(summary.day, config.miniApp.url, language);
         await bot.api
           .sendMessage(ownerChatId, notice.text, summaryMarkup(notice))
           .catch(() => undefined);
@@ -254,6 +273,9 @@ async function main(): Promise<void> {
     webRoot: config.miniApp.webRoot,
     debugFile: config.miniApp.debugFile,
     botUsername: () => botUsername,
+    language: (userId: number) => getLanguage(userId),
+    defaultLanguage: config.language.owner,
+    ownerId: ownerChatId,
     summaries: async () => {
       const rows = await db
         .select()

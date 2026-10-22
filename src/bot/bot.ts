@@ -1,5 +1,6 @@
-import { Bot, type Context } from "grammy";
+import { Bot, type Context, InlineKeyboard } from "grammy";
 import type { AppConfig } from "../config.js";
+import { isLanguage, LANGUAGE_NAMES, type Language, messages } from "../i18n/index.js";
 import type { Logger } from "../logger.js";
 import { describeAttachment, downloadAttachment } from "./attachments.js";
 
@@ -7,41 +8,30 @@ export interface BotDeps {
   config: AppConfig;
   logger: Logger;
   /** Runs the whole pipeline for a text message. */
-  onText: (text: string, userId: number, chatId: number) => Promise<void>;
+  onText: (text: string, userId: number, chatId: number, language: Language) => Promise<void>;
   /** Short status text of the bot, shown for /status. */
-  onStatus: (userId: number) => Promise<string>;
+  onStatus: (userId: number, language: Language) => Promise<string>;
   /** Searches the vault, shown for /search. */
-  onSearch: (query: string, userId: number) => Promise<string>;
+  onSearch: (query: string, userId: number, language: Language) => Promise<string>;
   /** Undoes the last write of the bot, shown for /undo. */
-  onUndo: (userId: number, confirmed: boolean) => Promise<string>;
+  onUndo: (userId: number, confirmed: boolean, language: Language) => Promise<string>;
   /** Lists the notes of the inbox, shown for /inbox. */
-  onInbox: (userId: number) => Promise<string>;
+  onInbox: (userId: number, language: Language) => Promise<string>;
   /** Makes the summary of a day, shown for /summary. */
-  onSummary: (day: string, userId: number) => Promise<string>;
+  onSummary: (day: string, userId: number, language: Language) => Promise<string>;
+  /** The language of the user, from the database. */
+  getLanguage: (userId: number) => Promise<Language>;
+  /** Remembers the language the user has chosen. */
+  setLanguage: (userId: number, language: Language) => Promise<void>;
   /** Saves a file of the owner and writes a note about it. */
   onAttachment: (input: {
     caption: string;
     file: { name: string; data: Uint8Array };
     userId: number;
     chatId: number;
+    language: Language;
   }) => Promise<void>;
 }
-
-const HELP = [
-  "Я превращаю твои мысли в заметки Obsidian.",
-  "",
-  "Просто пришли текст - я найду подходящую заметку или создам новую.",
-  "Если нужно проверить факты, я сам полезу в интернет через DuckDuckGo.",
-  "Теги пиши прямо в сообщении: #идея #работа - они попадут в заметку.",
-  "",
-  "Команды:",
-  "/start - это сообщение",
-  "/status - что уже записано",
-  "/search запрос - найти заметку по слову",
-  "/inbox - что ещё не разобрано",
-  "/undo - отменить мою последнюю запись",
-  "/summary - итог за вчера",
-].join("\n");
 
 /**
  * Creates the Telegram bot.
@@ -71,47 +61,89 @@ export function createBot(deps: BotDeps): Bot {
   });
 
   bot.command("start", async (ctx) => {
-    await ctx.reply(HELP);
+    const language = await deps.getLanguage(ctx.from?.id ?? 0);
+    await ctx.reply(messages(language).help);
   });
 
   bot.command("help", async (ctx) => {
-    await ctx.reply(HELP);
+    const language = await deps.getLanguage(ctx.from?.id ?? 0);
+    await ctx.reply(messages(language).help);
   });
 
   bot.command("status", async (ctx) => {
-    const status = await deps.onStatus(ctx.from?.id ?? 0);
-    await ctx.reply(status);
+    const userId = ctx.from?.id ?? 0;
+    const language = await deps.getLanguage(userId);
+    await ctx.reply(await deps.onStatus(userId, language));
   });
 
   bot.command("search", async (ctx) => {
+    const userId = ctx.from?.id ?? 0;
+    const language = await deps.getLanguage(userId);
     const query = ctx.match?.trim() ?? "";
-    const result = await deps.onSearch(query, ctx.from?.id ?? 0);
-    await ctx.reply(result);
+    await ctx.reply(await deps.onSearch(query, userId, language));
   });
 
   bot.command("inbox", async (ctx) => {
-    const result = await deps.onInbox(ctx.from?.id ?? 0);
-    await ctx.reply(result);
+    const userId = ctx.from?.id ?? 0;
+    const language = await deps.getLanguage(userId);
+    await ctx.reply(await deps.onInbox(userId, language));
   });
 
   bot.command("undo", async (ctx) => {
+    const userId = ctx.from?.id ?? 0;
+    const language = await deps.getLanguage(userId);
     const confirmed = (ctx.match ?? "").trim().toLowerCase() === "confirm";
-    const result = await deps.onUndo(ctx.from?.id ?? 0, confirmed);
-    await ctx.reply(result);
+    await ctx.reply(await deps.onUndo(userId, confirmed, language));
   });
 
   bot.command("summary", async (ctx) => {
+    const userId = ctx.from?.id ?? 0;
+    const language = await deps.getLanguage(userId);
     const day = (ctx.match ?? "").trim();
-    const result = await deps.onSummary(day, ctx.from?.id ?? 0);
-    await ctx.reply(result);
+    await ctx.reply(await deps.onSummary(day, userId, language));
   });
+
+  // The language of the bot: with an argument it is set at once, without it
+  // the bot offers the two languages.
+  bot.command("language", async (ctx) => {
+    const userId = ctx.from?.id ?? 0;
+    const language = await deps.getLanguage(userId);
+    const argument = (ctx.match ?? "").trim().toLowerCase();
+
+    if (argument) {
+      if (!isLanguage(argument)) {
+        await ctx.reply(messages(language).languageUnknown);
+        return;
+      }
+      await deps.setLanguage(userId, argument);
+      await ctx.reply(messages(argument).languageChanged(LANGUAGE_NAMES[argument]));
+      return;
+    }
+
+    const keyboard = new InlineKeyboard()
+      .text("English", "lang:en")
+      .row()
+      .text("Русский", "lang:ru");
+    await ctx.reply(messages(language).languageButton, { reply_markup: keyboard });
+  });
+
+  for (const language of ["en", "ru"] as Language[]) {
+    bot.callbackQuery(`lang:${language}`, async (ctx) => {
+      const userId = ctx.from?.id ?? 0;
+      await deps.setLanguage(userId, language);
+      await ctx.answerCallbackQuery({
+        text: messages(language).languageChanged(LANGUAGE_NAMES[language]),
+      });
+    });
+  }
 
   bot.on("message:text", async (ctx) => {
     const text = ctx.message.text.trim();
     if (!text) return;
     const userId = ctx.from?.id ?? 0;
-    const chatId = ctx.chat.id;
-    await deps.onText(text, userId, chatId);
+    const chatId = ctx.chat?.id ?? 0;
+    const language = await deps.getLanguage(userId);
+    await deps.onText(text, userId, chatId, language);
   });
 
   // A file of the owner: it is saved in the vault and gets a note.
@@ -122,6 +154,7 @@ export function createBot(deps: BotDeps): Bot {
     const userId = ctx.from?.id ?? 0;
     const chatId = ctx.chat?.id ?? 0;
     const caption = ctx.message?.caption?.trim() ?? "";
+    const language = await deps.getLanguage(userId);
 
     try {
       const data = await downloadAttachment(bot, config.telegram.botToken, attachment.fileId);
@@ -130,15 +163,14 @@ export function createBot(deps: BotDeps): Bot {
         file: { name: attachment.fileName, data },
         userId,
         chatId,
+        language,
       });
     } catch (error) {
       logger.error("could not save the file", {
         error: String(error),
         fileName: attachment.fileName,
       });
-      await ctx
-        .reply("⚠️ Не смог сохранить файл. Максимальный размер - 20 МБ.")
-        .catch(() => undefined);
+      await ctx.reply("⚠️ The file is too big, the limit is 20 MB.").catch(() => undefined);
     }
   };
 

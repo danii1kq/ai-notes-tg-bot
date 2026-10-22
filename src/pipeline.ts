@@ -1,6 +1,7 @@
 import type { AppConfig } from "./config.js";
 import type { HermesClient } from "./hermes/client.js";
 import { buildPrompt } from "./hermes/prompt.js";
+import { type Language, messages } from "./i18n/index.js";
 import type { Logger } from "./logger.js";
 import { embedMarkdown, type SavedAttachment } from "./vault/attachments.js";
 import { readEvents, type VaultEvent } from "./vault/events.js";
@@ -34,9 +35,10 @@ export async function processMessage(
   text: string,
   telegramUserId: number,
   deps: PipelineDeps,
-  options: { attachment?: SavedAttachment } = {},
+  options: { attachment?: SavedAttachment; language?: Language } = {},
 ): Promise<ProcessResult> {
   const startedAt = Date.now();
+  const language = options.language ?? "en";
   const titles = await deps.vault.noteTitles();
   const tags = extractTags(text);
   const attachment = options.attachment;
@@ -77,7 +79,7 @@ export async function processMessage(
       await ensureEmbed(deps.vault, last.path, attachment);
     }
     return {
-      status: statusFor(last),
+      status: statusFor(last, language),
       action: last.action,
       title: last.title,
       path: last.path,
@@ -94,7 +96,7 @@ export async function processMessage(
     ok: run.ok,
     error: run.error,
   });
-  return fallbackWrite(text, deps, run.text, attachment);
+  return fallbackWrite(text, deps, run.text, language, attachment);
 }
 
 /** Writes the message into the vault without the agent. */
@@ -102,6 +104,7 @@ async function fallbackWrite(
   text: string,
   deps: PipelineDeps,
   agentText: string,
+  language: Language,
   attachment?: SavedAttachment,
 ): Promise<ProcessResult> {
   const title = deriveTitle(text);
@@ -109,6 +112,7 @@ async function fallbackWrite(
   const stamp = deps.vault.currentDateTime();
   const tags = extractTags(text);
   const embed = attachment ? `\n\n${embedMarkdown(attachment.name)}\n` : "";
+  const text_ = messages(language);
 
   if (existing) {
     const block = `## ${stamp}\n\n${text.trim()}${embed}\n`;
@@ -117,7 +121,7 @@ async function fallbackWrite(
       await applyTags(deps.vault, result.relativePath, tags);
     }
     return {
-      status: `📥 Добавил запись в «${result.title}»`,
+      status: text_.noteAppended(result.title),
       action: "append",
       title: result.title,
       path: result.relativePath,
@@ -132,7 +136,7 @@ async function fallbackWrite(
     await applyTags(deps.vault, result.relativePath, tags);
   }
   return {
-    status: `📝 Создал заметку «${result.title}»`,
+    status: text_.noteCreated(result.title),
     action: "create",
     title: result.title,
     path: result.relativePath,
@@ -262,15 +266,17 @@ export function extractKeywords(text: string): string[] {
   ].slice(0, 6);
 }
 
-function statusFor(event: VaultEvent): string {
+/** The status line of a write, in the language of the owner. */
+function statusFor(event: VaultEvent, language: Language): string {
+  const text = messages(language);
   switch (event.action) {
     case "create":
-      return `📝 Создал заметку «${event.title}»`;
+      return text.noteCreated(event.title);
     case "overwrite":
-      return `📝 Обновил заметку «${event.title}»`;
+      return text.noteUpdated(event.title);
     case "append":
-      return `📥 Добавил запись в «${event.title}»`;
+      return text.noteAppended(event.title);
     default:
-      return `📝 Готово: «${event.title}»`;
+      return text.noteUpdated(event.title);
   }
 }

@@ -3,6 +3,7 @@ import type { AppConfig } from "../config.js";
 import type { Database } from "../db/index.js";
 import { dailySummaries, notesLog } from "../db/schema.js";
 import type { HermesClient } from "../hermes/client.js";
+import type { Language } from "../i18n/index.js";
 import type { Logger } from "../logger.js";
 import { readEvents } from "../vault/events.js";
 import { normalizeDashes, type VaultOperations } from "../vault/operations.js";
@@ -82,7 +83,11 @@ function sleep(milliseconds: number): Promise<void> {
  * Nothing happens when the owner did not write anything that day: the day is
  * simply missing in the file of the month.
  */
-export async function runDailySummary(deps: DailyDeps, day: string): Promise<DailySummary | null> {
+export async function runDailySummary(
+  deps: DailyDeps,
+  day: string,
+  language: Language = "ru",
+): Promise<DailySummary | null> {
   const notes = await collectNotesOfDay(deps, day);
   if (notes.length === 0) {
     deps.logger.info("no notes that day, the summary is skipped", { day });
@@ -99,7 +104,7 @@ export async function runDailySummary(deps: DailyDeps, day: string): Promise<Dai
     return null;
   }
 
-  const prompt = buildSummaryPrompt(day, notes);
+  const prompt = buildSummaryPrompt(day, notes, language);
   const startedAt = Date.now();
   const run = await deps.hermes.run(prompt, { toolsets: "safe" });
   if (!run.ok) {
@@ -154,7 +159,11 @@ export async function runDailySummaryForYesterday(deps: DailyDeps): Promise<Dail
  * The days are taken from the oldest to the newest, so the sections of the
  * file of the month stay in the right order.
  */
-export async function catchUpDailySummaries(deps: DailyDeps, days = 3): Promise<DailySummary[]> {
+export async function catchUpDailySummaries(
+  deps: DailyDeps,
+  days = 3,
+  language: Language = "ru",
+): Promise<DailySummary[]> {
   const today = localDate(new Date(), deps.config.vault.timeZone);
   const wanted: string[] = [];
   let day = today;
@@ -165,7 +174,7 @@ export async function catchUpDailySummaries(deps: DailyDeps, days = 3): Promise<
 
   const summaries: DailySummary[] = [];
   for (const wantedDay of wanted) {
-    const summary = await runDailySummary(deps, wantedDay);
+    const summary = await runDailySummary(deps, wantedDay, language);
     if (summary) summaries.push(summary);
   }
   return summaries;
@@ -214,9 +223,17 @@ export interface SummaryNotice {
  * The whole summary is in the file of the month and in the Mini App, the chat
  * only says that it is ready.
  */
-export function summaryNotice(day: string, miniAppUrl?: string): SummaryNotice {
+export function summaryNotice(
+  day: string,
+  miniAppUrl?: string,
+  language: Language = "ru",
+): SummaryNotice {
+  const text =
+    language === "en"
+      ? `The summary of ${day} is ready. It is in the Mini App.`
+      : `Итоги за ${day} готовы. Их можно посмотреть в мини-приложении.`;
   return {
-    text: `📅 Итоги за ${day} готовы. Их можно посмотреть в мини-приложении.`,
+    text,
     ...(miniAppUrl ? { miniAppUrl } : {}),
   };
 }
@@ -238,7 +255,11 @@ function excerptOf(content: string): string {
 }
 
 /** The prompt of the agent that makes the summary. */
-export function buildSummaryPrompt(day: string, notes: DayNote[]): string {
+export function buildSummaryPrompt(
+  day: string,
+  notes: DayNote[],
+  language: Language = "ru",
+): string {
   const list = notes
     .map((note, index) => {
       const parts = [`${index + 1}. Заметка «${note.title}» (${note.path})`];
@@ -246,6 +267,21 @@ export function buildSummaryPrompt(day: string, notes: DayNote[]): string {
       return parts.join("\n");
     })
     .join("\n\n");
+
+  if (language === "en") {
+    return [
+      `You keep the daily journal of the owner. Below are the notes they wrote on ${day}.`,
+      "",
+      list,
+      "",
+      "Write the summary of that day from these notes:",
+      "list the notes of the day and say in one or two sentences what is written in each of them.",
+      "Write plain English, one note per line.",
+      "Only what is in the notes, do not invent anything and do not add anything of your own.",
+      "No headers, no long dashes.",
+      "Do not write anything into the vault, answer with the text of the summary only.",
+    ].join("\n");
+  }
 
   return [
     `Ты ведёшь ежедневный журнал владельца. Ниже заметки, которые он записал за ${day}.`,
