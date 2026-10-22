@@ -81,7 +81,14 @@ WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --include=dev
 COPY web/ ./
-RUN npm run build
+
+# The build of the frontend. The bundle has to be in the image, without it the
+# Mini App opens as a blank page, so the build checks that it is complete.
+ENV NODE_ENV=production
+RUN rm -rf dist \
+    && npm run build \
+    && test -f dist/index.html \
+    && ls dist/assets/*.js
 
 # --- Runtime -----------------------------------------------------------------
 FROM base AS runtime
@@ -94,6 +101,9 @@ COPY --from=builder /app/dist ./dist
 COPY --from=web-builder /web/dist ./web
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
+
+# The frontend has to be complete in the image as well.
+RUN test -f /app/web/index.html && ls /app/web/assets/*.js
 
 # The rules of the agent and the entrypoint of the container.
 COPY --chown=node:node hermes/workspace/.hermes.md /app/hermes-workspace/.hermes.md

@@ -9,6 +9,8 @@ node_modules
 **/node_modules
 dist
 **/dist
+web/dist
+web/node_modules
 coverage
 **/coverage
 tests
