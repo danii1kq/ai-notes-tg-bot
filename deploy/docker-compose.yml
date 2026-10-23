@@ -26,7 +26,7 @@ services:
       VAULT_EVENTS_FILE: /app/data/vault-events.json
       DB_PATH: /app/data/app.db
       HERMES_WORKSPACE: /app/hermes-workspace
-      HERMES_MODEL: ${HERMES_MODEL:-minimax-m3.1-flash-free}
+      HERMES_MODEL: ${HERMES_MODEL:-beam-free}
       HERMES_FALLBACK_MODEL: ${HERMES_FALLBACK_MODEL:-deepseek-v4.1-flash}
       LLM_PROVIDER_BASE_URL: ${LLM_PROVIDER_BASE_URL:-https://opencode.ai/zen/go/v1}
       LLM_PROXY_PORT: ${LLM_PROXY_PORT:-11434}

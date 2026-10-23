@@ -52,7 +52,7 @@ unset ALLOWED_TELEGRAM_ID
 hermes config set model.provider custom 2>/dev/null || log "warning: could not set model.provider"
 hermes config set model.base_url "http://127.0.0.1:${LLM_PROXY_PORT:-11434}/v1" 2>/dev/null || log "warning: could not set model.base_url"
 hermes config set model.api_key "local-proxy" 2>/dev/null || log "warning: could not set model.api_key"
-hermes config set model.default "${HERMES_MODEL:-minimax-m3.1-flash-free}" 2>/dev/null || log "warning: could not set model.default"
+hermes config set model.default "${HERMES_MODEL:-beam-free}" 2>/dev/null || log "warning: could not set model.default"
 
 # --- MCP servers ------------------------------------------------------------
 # The servers are written with `hermes config set`, the command that updates

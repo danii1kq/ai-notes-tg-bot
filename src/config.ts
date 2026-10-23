@@ -26,7 +26,7 @@ const envSchema = z.object({
 
   // --- Hermes Agent -------------------------------------------------------
   HERMES_BIN: z.string().default("hermes"),
-  HERMES_MODEL: z.string().default("minimax-m3.1-flash-free"),
+  HERMES_MODEL: z.string().default("beam-free"),
   HERMES_FALLBACK_MODEL: z.string().default("deepseek-v4.1-flash"),
   HERMES_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
   HERMES_MAX_TURNS: z.coerce.number().int().positive().default(16),

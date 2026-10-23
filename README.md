@@ -156,7 +156,7 @@ Requirements: a Linux server with Docker and Docker Compose.
    | `TELEGRAM_WEBHOOK_SECRET` | the secret that Telegram sends with every webhook call |
    | `VAULT_HOST_PATH` | folder of the vault on the server, for example `/opt/obsidian-vault` |
    | `LLM_API_KEY` | key of the model provider |
-   | `HERMES_MODEL` | model, `minimax-m3.1-flash-free` by default |
+   | `HERMES_MODEL` | model, `beam-free` by default |
    | `HERMES_FALLBACK_MODEL` | model used when the first one fails |
    | `MINI_APP_URL` | the public https address of the Mini App, for the menu button |
    | `MINI_APP_TOKEN` | the token for the browser, the address of the app carries it |
@@ -454,7 +454,7 @@ tags: [journal, daily]
    | `TELEGRAM_WEBHOOK_SECRET` | секрет, который Telegram шлёт с каждым вызовом webhook |
    | `VAULT_HOST_PATH` | папка хранилища на сервере, например `/opt/obsidian-vault` |
    | `LLM_API_KEY` | ключ модельного провайдера |
-   | `HERMES_MODEL` | модель, по умолчанию `minimax-m3.1-flash-free` |
+   | `HERMES_MODEL` | модель, по умолчанию `beam-free` |
    | `HERMES_FALLBACK_MODEL` | резервная модель, если основная не ответила |
    | `MINI_APP_URL` | публичный https-адрес мини-приложения, для кнопки в меню |
    | `MINI_APP_TOKEN` | токен для браузера, он едет в адресе приложения |
